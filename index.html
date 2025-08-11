@@ -63,32 +63,18 @@
             <div class="card text-center">
                 <h2 class="text-3xl font-bold text-gray-900">What role are you preparing for?</h2>
                 <div class="mt-6">
-                    <input type="text" id="role-input" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="e.g., Product Manager, Software Engineer...">
+                    <select id="role-input" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select a role...</option>
+                        <option value="Product Manager">Product Manager</option>
+                        <option value="Software Engineer">Software Engineer</option>
+                        <option value="Data Analyst">Data Analyst</option>
+                    </select>
                 </div>
                 <button id="role-next-btn" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
             </div>
         </div>
 
-        <!-- Act I, Scene 2, Step 2: Onboarding - Context (JD & Resume) -->
-        <div id="onboarding-context-screen" class="hidden screen-container">
-             <div class="card text-center">
-                <h2 class="text-3xl font-bold text-gray-900">Now, for the magic.</h2>
-                <p class="text-lg text-gray-600 mt-2 mb-6">We'll use this to create a hyper-realistic interview just for you.</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                    <div>
-                        <label for="jd-input" class="block text-sm font-medium text-gray-700 mb-1">Target Job Description</label>
-                        <textarea id="jd-input" rows="12" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste the job description..."></textarea>
-                    </div>
-                    <div>
-                        <label for="resume-input" class="block text-sm font-medium text-gray-700 mb-1">Your Resume</label>
-                        <textarea id="resume-input" rows="12" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste your resume..."></textarea>
-                    </div>
-                </div>
-                <button id="context-next-btn" class="mt-8 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
-            </div>
-        </div>
-        
-        <!-- Act I, Scene 2, Step 3: Onboarding - Experience -->
+        <!-- Act I, Scene 2, Step 2: Onboarding - Experience -->
         <div id="onboarding-experience-screen" class="hidden screen-container">
             <div class="card text-center">
                 <h2 class="text-3xl font-bold text-gray-900">What's your experience level?</h2>
@@ -107,6 +93,20 @@
                         <h3 class="text-lg font-semibold">Manager / Lead</h3>
                     </button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Act I, Scene 2, Step 3: Onboarding - Skills to Practice -->
+        <div id="onboarding-skills-screen" class="hidden screen-container">
+            <div class="card text-center">
+                <h2 class="text-3xl font-bold text-gray-900">What skills would you like to practice?</h2>
+                <p class="text-lg text-gray-600 mt-2 mb-8">Select the skills you want to focus on during your interview practice.</p>
+                <div class="text-left">
+                    <div id="skills-options" class="space-y-3">
+                        <!-- Skills will be populated dynamically based on role and experience -->
+                    </div>
+                </div>
+                <button id="skills-next-btn" class="mt-8 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
             </div>
         </div>
 
@@ -206,8 +206,8 @@
         const screens = {
             homepage: document.getElementById('homepage-screen'),
             onboardingRole: document.getElementById('onboarding-role-screen'),
-            onboardingContext: document.getElementById('onboarding-context-screen'),
             onboardingExperience: document.getElementById('onboarding-experience-screen'),
+            onboardingSkills: document.getElementById('onboarding-skills-screen'),
             dashboard: document.getElementById('dashboard-screen'),
             readyRoom: document.getElementById('ready-room-screen'),
             interview: document.getElementById('interview-screen'),
@@ -215,8 +215,7 @@
             feedback: document.getElementById('feedback-screen'),
         };
         const roleInput = document.getElementById('role-input');
-        const jdInput = document.getElementById('jd-input');
-        const resumeInput = document.getElementById('resume-input');
+        const skillsOptions = document.getElementById('skills-options');
         const keySkillsList = document.getElementById('key-skills-list');
         const dashboardRoleCompany = document.getElementById('dashboard-role-company');
         const chatInput = document.getElementById('chat-input');
@@ -240,6 +239,7 @@
             clearInterval(interviewTimer);
             Object.values(document.getElementsByTagName('textarea')).forEach(t => t.value = '');
             Object.values(document.getElementsByTagName('input')).forEach(i => i.value = '');
+            Object.values(document.getElementsByTagName('select')).forEach(s => s.selectedIndex = 0);
             chatWindow.innerHTML = '';
             feedbackOutput.innerHTML = '';
             showScreen('homepage');
@@ -248,27 +248,59 @@
         // --- Onboarding Flow ---
         document.getElementById('start-onboarding-btn').addEventListener('click', () => showScreen('onboardingRole'));
         document.getElementById('role-next-btn').addEventListener('click', () => {
-            if (!roleInput.value.trim()) { alert('Please specify a role.'); return; }
+            if (!roleInput.value.trim()) { alert('Please select a role.'); return; }
             userContext.role = roleInput.value.trim();
-            showScreen('onboardingContext');
-        });
-        document.getElementById('context-next-btn').addEventListener('click', () => {
-            if (!jdInput.value.trim()) { alert('Please provide a job description.'); return; }
-            userContext.jobDesc = jdInput.value;
-            userContext.resume = resumeInput.value;
             showScreen('onboardingExperience');
         });
         async function handleExperienceSelect(level) {
             userContext.experience = level;
+            showScreen('onboardingSkills');
+            await populateSkillsOptions();
+        }
+        document.getElementById('skills-next-btn').addEventListener('click', () => {
+            const selectedSkills = Array.from(document.querySelectorAll('input[name="skills"]:checked')).map(cb => cb.value);
+            if (selectedSkills.length === 0) { alert('Please select at least one skill to practice.'); return; }
+            userContext.selectedSkills = selectedSkills;
             showScreen('dashboard');
-            await generateDashboardSkills();
+            generateDashboardSkills();
+        });
+
+        async function populateSkillsOptions() {
+            // Dummy skills based on role and experience - will be filled later
+            const skillsByRole = {
+                'Product Manager': {
+                    'Student/Intern': ['User Research', 'Basic Analytics', 'Stakeholder Communication', 'Problem Framing', 'Market Analysis'],
+                    'Junior / Mid-Level': ['Product Strategy', 'Data Analysis', 'Cross-functional Collaboration', 'User Experience Design', 'A/B Testing'],
+                    'Senior': ['Product Vision', 'Strategic Thinking', 'Team Leadership', 'Business Metrics', 'Innovation Management'],
+                    'Manager / Lead': ['Team Management', 'Strategic Planning', 'Stakeholder Management', 'Product Portfolio', 'Business Development']
+                },
+                'Software Engineer': {
+                    'Student/Intern': ['Basic Programming', 'Data Structures', 'Algorithms', 'Version Control', 'Testing'],
+                    'Junior / Mid-Level': ['System Design', 'Code Quality', 'Performance Optimization', 'API Design', 'Database Design'],
+                    'Senior': ['Architecture Design', 'Technical Leadership', 'Code Review', 'Performance Engineering', 'Security'],
+                    'Manager / Lead': ['Technical Strategy', 'Team Leadership', 'Project Management', 'System Architecture', 'Innovation']
+                },
+                'Data Analyst': {
+                    'Student/Intern': ['Basic SQL', 'Data Cleaning', 'Excel', 'Basic Statistics', 'Data Visualization'],
+                    'Junior / Mid-Level': ['Advanced SQL', 'Statistical Analysis', 'Python/R', 'Data Modeling', 'Business Intelligence'],
+                    'Senior': ['Machine Learning', 'Advanced Analytics', 'Data Strategy', 'Team Leadership', 'Business Impact'],
+                    'Manager / Lead': ['Data Strategy', 'Team Management', 'Business Intelligence', 'Analytics Strategy', 'Stakeholder Management']
+                }
+            };
+
+            const skills = skillsByRole[userContext.role]?.[userContext.experience] || ['Skill 1', 'Skill 2', 'Skill 3', 'Skill 4', 'Skill 5'];
+            
+            skillsOptions.innerHTML = skills.map(skill => `
+                <label class="flex items-center space-x-3 cursor-pointer">
+                    <input type="checkbox" name="skills" value="${skill}" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                    <span class="text-gray-700">${skill}</span>
+                </label>
+            `).join('');
         }
 
         async function generateDashboardSkills() {
-            dashboardRoleCompany.textContent = `For a ${userContext.role} role.`;
-            const prompt = `Based on the following job description, identify the top 5 most important skills a candidate should demonstrate. List them clearly. Do not add any preamble. Example: - Skill 1\n- Skill 2\n... \n\nJOB DESCRIPTION:\n${userContext.jobDesc}`;
-            const skillsText = await callGeminiAPI(prompt);
-            keySkillsList.innerHTML = skillsText.split('\n').map(skill => skill.trim() ? `<li>${skill.replace(/^- /, '')}</li>` : '').join('');
+            dashboardRoleCompany.textContent = `For a ${userContext.role} role (${userContext.experience} level).`;
+            keySkillsList.innerHTML = userContext.selectedSkills.map(skill => `<li>${skill}</li>`).join('');
         }
 
         // --- Interview Flow ---
@@ -297,7 +329,7 @@
 
         async function startInterview() {
             startTimer();
-            const prompt = `You are an expert interviewer hiring for a "${userContext.role}" (${userContext.experience} level). Your task is to start an interview with a candidate. Their resume and the target job description are below. Ask a single, insightful opening question based on their resume and the JD. Do not add any preamble like "Hello". Just ask the question directly. JOB DESCRIPTION:\n${userContext.jobDesc}\n\nCANDIDATE RESUME:\n${userContext.resume}`;
+            const prompt = `You are an expert interviewer hiring for a "${userContext.role}" (${userContext.experience} level). Your task is to start an interview with a candidate. Focus on the following skills: ${userContext.selectedSkills.join(', ')}. Ask a single, insightful opening question that would help assess these skills. Do not add any preamble like "Hello". Just ask the question directly.`;
             const firstQuestion = await callGeminiAPI(prompt);
             conversationHistory.push({ role: 'model', parts: [{ text: firstQuestion }] });
             addMessageToChat(firstQuestion, 'ai');
@@ -319,7 +351,7 @@
             }
 
             const thinkingBubble = addMessageToChat('Thinking...', 'ai', true);
-            const prompt = `You are an expert interviewer for a "${userContext.role}" (${userContext.experience}) position. Below is the conversation history. Ask the next logical follow-up question. Dig deeper into the candidate's last response. Keep it concise. Just ask the single next question. HISTORY:\n${conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n')}`;
+            const prompt = `You are an expert interviewer for a "${userContext.role}" (${userContext.experience}) position. Focus on assessing these skills: ${userContext.selectedSkills.join(', ')}. Below is the conversation history. Ask the next logical follow-up question that helps evaluate the candidate's proficiency in these areas. Dig deeper into the candidate's last response. Keep it concise. Just ask the single next question. HISTORY:\n${conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n')}`;
             const nextQuestion = await callGeminiAPI(prompt);
             chatWindow.removeChild(thinkingBubble);
             conversationHistory.push({ role: 'model', parts: [{ text: nextQuestion }] });
