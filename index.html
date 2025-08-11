@@ -3,229 +3,301 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PrepAI - PM Interview Simulator</title>
+    <title>PrepAI - AI Interview Coach</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
         }
-        .chat-bubble {
-            max-width: 75%;
-            padding: 12px 16px;
-            border-radius: 16px;
-            word-wrap: break-word;
+        .hidden { display: none; }
+        .screen-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
         }
-        .chat-bubble-user {
-            background-color: #2563eb;
-            color: white;
-            border-bottom-right-radius: 4px;
+        .card {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
         }
-        .chat-bubble-ai {
-            background-color: #e5e7eb;
-            color: #1f2937;
-            border-bottom-left-radius: 4px;
-        }
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        .chat-bubble { max-width: 75%; padding: 12px 16px; border-radius: 16px; word-wrap: break-word; }
+        .chat-bubble-user { background-color: #2563eb; color: white; border-bottom-right-radius: 4px; }
+        .chat-bubble-ai { background-color: #e5e7eb; color: #1f2937; border-bottom-left-radius: 4px; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .choice-button { transition: all 0.2s ease-in-out; }
+        .choice-button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800">
+<body class="text-gray-800">
 
-    <div class="container mx-auto max-w-4xl p-4">
-        <header class="text-center my-6">
-            <h1 class="text-4xl font-bold text-gray-900">PrepAI Weekend Prototype</h1>
-            <p class="text-lg text-gray-600 mt-2">A high-fidelity PM interview simulator with an actionable feedback loop.</p>
-        </header>
+    <div id="app-container" class="container mx-auto max-w-3xl">
 
-        <!-- Step 1: User Context Input -->
-        <div id="context-section" class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-semibold mb-4">1. Provide Context</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <label for="resume" class="block text-sm font-medium text-gray-700 mb-1">Paste Your Resume</label>
-                    <textarea id="resume" rows="10" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste your full resume here..."></textarea>
-                </div>
-                <div>
-                    <label for="job-desc" class="block text-sm font-medium text-gray-700 mb-1">Paste Target Job Description</label>
-                    <textarea id="job-desc" rows="10" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste the job description you're targeting..."></textarea>
+        <!-- Act I, Scene 1: Homepage -->
+        <div id="homepage-screen" class="screen-container">
+            <div class="card text-center">
+                <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Go from Interview Anxiety to a Confident "Yes."</h1>
+                <p class="text-lg text-gray-600 mt-4">Practice with our AI-powered interviewer, get instant, actionable feedback, and ace the hiring process for your dream job.</p>
+                <button id="start-onboarding-btn" class="mt-8 w-full md:w-auto bg-blue-600 text-white font-bold py-4 px-8 rounded-lg hover:bg-blue-700 transition duration-300 text-lg">Start Your First Free Mock Interview</button>
+                <div class="mt-8">
+                    <p class="text-sm text-gray-500 uppercase tracking-wider">TRUSTED BY CANDIDATES HIRED AT</p>
+                    <div class="flex justify-center items-center gap-8 mt-4 text-gray-400">
+                        <span class="font-bold">Google</span>
+                        <span class="font-bold">Amazon</span>
+                        <span class="font-bold">Meta</span>
+                        <span class="font-bold">Netflix</span>
+                    </div>
                 </div>
             </div>
-            <button id="start-interview-btn" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400">
-                Start Interview
-            </button>
         </div>
 
-        <!-- Step 2: Interview Chat -->
-        <div id="interview-section" class="hidden bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-2xl font-semibold mb-4">2. Your Interview</h2>
-            <div id="chat-window" class="h-96 border border-gray-200 rounded-lg p-4 overflow-y-auto flex flex-col gap-4 mb-4">
-                <!-- Chat messages will be appended here -->
+        <!-- Act I, Scene 2, Step 1: Onboarding - Role -->
+        <div id="onboarding-role-screen" class="hidden screen-container">
+            <div class="card text-center">
+                <h2 class="text-3xl font-bold text-gray-900">What role are you preparing for?</h2>
+                <div class="mt-6">
+                    <input type="text" id="role-input" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="e.g., Product Manager, Software Engineer...">
+                </div>
+                <button id="role-next-btn" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
             </div>
-            <div class="flex gap-4">
+        </div>
+
+        <!-- Act I, Scene 2, Step 2: Onboarding - Context (JD & Resume) -->
+        <div id="onboarding-context-screen" class="hidden screen-container">
+             <div class="card text-center">
+                <h2 class="text-3xl font-bold text-gray-900">Now, for the magic.</h2>
+                <p class="text-lg text-gray-600 mt-2 mb-6">We'll use this to create a hyper-realistic interview just for you.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+                    <div>
+                        <label for="jd-input" class="block text-sm font-medium text-gray-700 mb-1">Target Job Description</label>
+                        <textarea id="jd-input" rows="12" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste the job description..."></textarea>
+                    </div>
+                    <div>
+                        <label for="resume-input" class="block text-sm font-medium text-gray-700 mb-1">Your Resume</label>
+                        <textarea id="resume-input" rows="12" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste your resume..."></textarea>
+                    </div>
+                </div>
+                <button id="context-next-btn" class="mt-8 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
+            </div>
+        </div>
+        
+        <!-- Act I, Scene 2, Step 3: Onboarding - Experience -->
+        <div id="onboarding-experience-screen" class="hidden screen-container">
+            <div class="card text-center">
+                <h2 class="text-3xl font-bold text-gray-900">What's your experience level?</h2>
+                <p class="text-lg text-gray-600 mt-2 mb-8">This helps us calibrate the difficulty and type of questions.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <button onclick="handleExperienceSelect('Student/Intern')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
+                        <h3 class="text-lg font-semibold">Student / Intern</h3>
+                    </button>
+                    <button onclick="handleExperienceSelect('Junior / Mid-Level')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
+                        <h3 class="text-lg font-semibold">Junior / Mid-Level</h3>
+                    </button>
+                    <button onclick="handleExperienceSelect('Senior')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
+                        <h3 class="text-lg font-semibold">Senior</h3>
+                    </button>
+                    <button onclick="handleExperienceSelect('Manager / Lead')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
+                        <h3 class="text-lg font-semibold">Manager / Lead</h3>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Act II: The Preparation Hub (Dashboard) -->
+        <div id="dashboard-screen" class="hidden screen-container">
+            <div class="card w-full">
+                <h2 class="text-3xl font-bold text-gray-900">Your Preparation Hub</h2>
+                <div class="mt-6 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                    <h3 class="text-xl font-bold text-blue-800">Your Personalized Mock Interview is Ready</h3>
+                    <p id="dashboard-role-company" class="text-blue-600 mt-1"></p>
+                    <button id="go-to-ready-room-btn" class="mt-4 bg-blue-600 text-white font-bold py-3 px-5 rounded-md hover:bg-blue-700 transition duration-300">Start Interview</button>
+                </div>
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="p-6 bg-gray-50 rounded-lg border">
+                        <h4 class="font-bold text-gray-800">Key Skills to Practice</h4>
+                        <ul id="key-skills-list" class="mt-3 text-gray-600 list-disc list-inside">
+                            <li class="animate-pulse">Analyzing job description...</li>
+                        </ul>
+                    </div>
+                    <div class="p-6 bg-gray-50 rounded-lg border">
+                        <h4 class="font-bold text-gray-800">Quick Drills</h4>
+                        <p class="mt-3 text-gray-600">Practice your "Tell Me About Yourself" pitch. (Coming Soon)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Act III, Scene 1: The Ready Room -->
+        <div id="ready-room-screen" class="hidden screen-container">
+            <div class="card text-center">
+                <h2 class="text-3xl font-bold text-gray-900">Ready Room</h2>
+                <p class="text-lg text-gray-600 mt-4">Check your camera and microphone.</p>
+                <div class="my-6 p-4 bg-gray-800 rounded-md h-48 flex items-center justify-center text-white">
+                    Camera/Mic Check Placeholder
+                </div>
+                <div class="p-4 bg-green-50 text-green-800 rounded-lg">
+                    <p><span class="font-bold">Remember:</span> This is a practice field. The goal is progress, not perfection. Take a deep breath. You're ready.</p>
+                </div>
+                <button id="start-interview-btn" class="mt-8 w-full bg-green-600 text-white font-bold py-3 px-4 rounded-md hover:bg-green-700 transition duration-300">Begin Interview</button>
+            </div>
+        </div>
+
+        <!-- Act III, Scene 2: The Interview -->
+        <div id="interview-screen" class="hidden card flex flex-col" style="height: 90vh; max-height: 90vh;">
+            <div class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
+                <!-- Chat Window -->
+                <div class="flex-grow flex flex-col">
+                    <h2 class="text-xl font-semibold mb-2 text-center">Interview in Progress</h2>
+                    <div id="chat-window" class="flex-grow border rounded-lg p-4 overflow-y-auto flex flex-col gap-4 bg-gray-50">
+                        <!-- Chat messages appear here -->
+                    </div>
+                </div>
+                <!-- Notepad & Timer -->
+                <div class="w-full md:w-64 flex-shrink-0 flex flex-col gap-4">
+                    <div class="flex-grow flex flex-col">
+                         <label for="notepad" class="font-semibold mb-1">Private Notepad</label>
+                         <textarea id="notepad" class="w-full flex-grow border rounded-lg p-2 text-sm" placeholder="Jot down your thoughts..."></textarea>
+                    </div>
+                    <div id="timer" class="text-center font-mono text-lg p-2 border rounded-lg">00:00</div>
+                </div>
+            </div>
+             <div class="flex gap-4 mt-4">
                 <input type="text" id="chat-input" class="flex-grow p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Type your answer..." disabled>
-                <button id="send-btn" class="bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400" disabled>Send</button>
+                <button id="send-btn" class="bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400" disabled>Send</button>
             </div>
-            <button id="end-interview-btn" class="mt-4 w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700 transition duration-300">
-                End Interview & Get Feedback
-            </button>
+            <button id="end-interview-btn" class="mt-4 w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700">End Interview & Get Feedback</button>
         </div>
 
-        <!-- Step 3: Analysis & Feedback -->
-        <div id="feedback-section" class="hidden">
-            <div id="analysis-loader" class="text-center bg-white p-6 rounded-lg shadow-md">
-                 <h2 class="text-2xl font-semibold mb-4">3. Analyzing Your Interview...</h2>
-                 <p class="text-gray-600 mb-6">The "Assembly Line" is now processing your conversation. Our committee of AI specialists is evaluating your performance.</p>
-                 <div class="flex justify-center">
-                    <div class="loader"></div>
-                 </div>
-            </div>
-            <div id="feedback-content" class="hidden bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-semibold mb-4">3. Your Actionable Feedback</h2>
-                <div id="feedback-output" class="prose max-w-none"></div>
+        <!-- Act IV: Analysis Loader -->
+        <div id="analysis-screen" class="hidden screen-container">
+            <div class="card text-center">
+                 <h2 class="text-3xl font-bold text-gray-900 mb-4">Analyzing Your Performance...</h2>
+                 <p class="text-lg text-gray-600 mb-8">Generating your personalized feedback report.</p>
+                 <div class="flex justify-center"><div class="loader"></div></div>
             </div>
         </div>
+
+        <!-- Act IV: Feedback Report -->
+        <div id="feedback-screen" class="hidden screen-container">
+            <div class="card">
+                <h2 class="text-3xl font-bold text-gray-900 mb-6 text-center">Your Actionable Feedback Report</h2>
+                <div id="feedback-output" class="space-y-6"></div>
+                <button onclick="restart()" class="mt-8 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700">Start a New Interview</button>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // --- DOM Elements ---
-        const contextSection = document.getElementById('context-section');
-        const interviewSection = document.getElementById('interview-section');
-        const feedbackSection = document.getElementById('feedback-section');
-        const analysisLoader = document.getElementById('analysis-loader');
-        const feedbackContent = document.getElementById('feedback-content');
+        // --- State Management ---
+        let userContext = {};
+        let conversationHistory = [];
+        let interviewTimer;
+        const MAX_QUESTIONS = 5; 
         
-        const startInterviewBtn = document.getElementById('start-interview-btn');
-        const endInterviewBtn = document.getElementById('end-interview-btn');
-        const sendBtn = document.getElementById('send-btn');
-        
-        const resumeInput = document.getElementById('resume');
-        const jobDescInput = document.getElementById('job-desc');
+        // --- Screen & Element References ---
+        const screens = {
+            homepage: document.getElementById('homepage-screen'),
+            onboardingRole: document.getElementById('onboarding-role-screen'),
+            onboardingContext: document.getElementById('onboarding-context-screen'),
+            onboardingExperience: document.getElementById('onboarding-experience-screen'),
+            dashboard: document.getElementById('dashboard-screen'),
+            readyRoom: document.getElementById('ready-room-screen'),
+            interview: document.getElementById('interview-screen'),
+            analysis: document.getElementById('analysis-screen'),
+            feedback: document.getElementById('feedback-screen'),
+        };
+        const roleInput = document.getElementById('role-input');
+        const jdInput = document.getElementById('jd-input');
+        const resumeInput = document.getElementById('resume-input');
+        const keySkillsList = document.getElementById('key-skills-list');
+        const dashboardRoleCompany = document.getElementById('dashboard-role-company');
         const chatInput = document.getElementById('chat-input');
         const chatWindow = document.getElementById('chat-window');
         const feedbackOutput = document.getElementById('feedback-output');
-
-        // --- State Management ---
-        let conversationHistory = [];
-        let userContext = {};
-        const MAX_QUESTIONS = 5; // For a weekend project, limit the conversation length
+        const timerDisplay = document.getElementById('timer');
 
         // --- Gemini API Configuration ---
-        // IMPORTANT: In a real application, the API key should be handled on a secure backend.
-        // For this self-contained prototype, we'll define it here.
-        // Canvas will automatically provide the key in runtime.
-        const API_KEY = ""; 
+        const API_KEY = ""; // Provided by Canvas
         const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
         
-        /**
-         * A generic function to call the Gemini API.
-         * Implements exponential backoff for retries.
-         * @param {string} prompt The prompt to send to the model.
-         * @param {number} maxRetries The maximum number of retries.
-         * @returns {Promise<string>} The generated text from the model.
-         */
-        async function callGeminiAPI(prompt, maxRetries = 3) {
-            const payload = {
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.6,
-                    topP: 0.9,
-                    maxOutputTokens: 2048,
-                }
-            };
-
-            let attempt = 0;
-            while (attempt < maxRetries) {
-                try {
-                    const response = await fetch(API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!response.ok) {
-                        throw new Error(`API call failed with status: ${response.status}`);
-                    }
-
-                    const result = await response.json();
-                    
-                    if (result.candidates && result.candidates.length > 0 &&
-                        result.candidates[0].content && result.candidates[0].content.parts &&
-                        result.candidates[0].content.parts.length > 0) {
-                        return result.candidates[0].content.parts[0].text;
-                    } else {
-                        // Handle cases of blocked content or unexpected response structure
-                        console.error("API response missing content:", result);
-                        return "I'm sorry, I couldn't generate a response due to content restrictions. Let's try a different question.";
-                    }
-                } catch (error) {
-                    console.error(`API call attempt ${attempt + 1} failed:`, error);
-                    attempt++;
-                    if (attempt >= maxRetries) {
-                        return "I'm having trouble connecting to my brain right now. Please try again later.";
-                    }
-                    const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-                    await new Promise(res => setTimeout(res, delay));
-                }
-            }
+        // --- Core App Logic ---
+        function showScreen(screenKey) {
+            Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+            screens[screenKey].classList.remove('hidden');
         }
 
-        // --- UI Functions ---
-        function addMessageToChat(message, sender) {
-            const bubble = document.createElement('div');
-            bubble.classList.add('chat-bubble', sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai');
-            bubble.classList.add(sender === 'user' ? 'self-end' : 'self-start');
-            bubble.textContent = message;
-            chatWindow.appendChild(bubble);
-            chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll to bottom
+        function restart() {
+            userContext = {};
+            conversationHistory = [];
+            clearInterval(interviewTimer);
+            Object.values(document.getElementsByTagName('textarea')).forEach(t => t.value = '');
+            Object.values(document.getElementsByTagName('input')).forEach(i => i.value = '');
+            chatWindow.innerHTML = '';
+            feedbackOutput.innerHTML = '';
+            showScreen('homepage');
         }
 
-        function toggleChatInput(disabled) {
-            chatInput.disabled = disabled;
-            sendBtn.disabled = disabled;
-            if (!disabled) {
-                chatInput.focus();
-            }
-        }
-
-        // --- Interview Logic ---
-        async function startInterview() {
+        // --- Onboarding Flow ---
+        document.getElementById('start-onboarding-btn').addEventListener('click', () => showScreen('onboardingRole'));
+        document.getElementById('role-next-btn').addEventListener('click', () => {
+            if (!roleInput.value.trim()) { alert('Please specify a role.'); return; }
+            userContext.role = roleInput.value.trim();
+            showScreen('onboardingContext');
+        });
+        document.getElementById('context-next-btn').addEventListener('click', () => {
+            if (!jdInput.value.trim()) { alert('Please provide a job description.'); return; }
+            userContext.jobDesc = jdInput.value;
             userContext.resume = resumeInput.value;
-            userContext.jobDesc = jobDescInput.value;
+            showScreen('onboardingExperience');
+        });
+        async function handleExperienceSelect(level) {
+            userContext.experience = level;
+            showScreen('dashboard');
+            await generateDashboardSkills();
+        }
 
-            if (!userContext.resume.trim() || !userContext.jobDesc.trim()) {
-                alert('Please provide both your resume and a target job description.');
-                return;
-            }
+        async function generateDashboardSkills() {
+            dashboardRoleCompany.textContent = `For a ${userContext.role} role.`;
+            const prompt = `Based on the following job description, identify the top 5 most important skills a candidate should demonstrate. List them clearly. Do not add any preamble. Example: - Skill 1\n- Skill 2\n... \n\nJOB DESCRIPTION:\n${userContext.jobDesc}`;
+            const skillsText = await callGeminiAPI(prompt);
+            keySkillsList.innerHTML = skillsText.split('\n').map(skill => skill.trim() ? `<li>${skill.replace(/^- /, '')}</li>` : '').join('');
+        }
 
-            startInterviewBtn.disabled = true;
-            startInterviewBtn.textContent = 'Starting...';
+        // --- Interview Flow ---
+        document.getElementById('go-to-ready-room-btn').addEventListener('click', () => showScreen('readyRoom'));
+        document.getElementById('start-interview-btn').addEventListener('click', () => {
+            showScreen('interview');
+            startInterview();
+        });
+        document.getElementById('send-btn').addEventListener('click', handleUserResponse);
+        chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.target.disabled) handleUserResponse(); });
+        document.getElementById('end-interview-btn').addEventListener('click', () => {
+            showScreen('analysis');
+            endInterview();
+        });
+        
+        function startTimer() {
+            let seconds = 0;
+            timerDisplay.textContent = "00:00";
+            interviewTimer = setInterval(() => {
+                seconds++;
+                const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+                const secs = (seconds % 60).toString().padStart(2, '0');
+                timerDisplay.textContent = `${mins}:${secs}`;
+            }, 1000);
+        }
 
-            contextSection.classList.add('hidden');
-            interviewSection.classList.remove('hidden');
-
-            const prompt = `
-                You are a senior product manager hiring for the role described below. Your task is to start an interview with a candidate whose resume is also provided.
-                Ask a single, insightful opening question based on their resume that probes their experience relevant to the job description.
-                Do not add any preamble like "Hello" or "Thanks for coming in". Just ask the question directly.
-
-                --- JOB DESCRIPTION ---
-                ${userContext.jobDesc}
-
-                --- CANDIDATE RESUME ---
-                ${userContext.resume}
-            `;
-            
+        async function startInterview() {
+            startTimer();
+            const prompt = `You are an expert interviewer hiring for a "${userContext.role}" (${userContext.experience} level). Your task is to start an interview with a candidate. Their resume and the target job description are below. Ask a single, insightful opening question based on their resume and the JD. Do not add any preamble like "Hello". Just ask the question directly. JOB DESCRIPTION:\n${userContext.jobDesc}\n\nCANDIDATE RESUME:\n${userContext.resume}`;
             const firstQuestion = await callGeminiAPI(prompt);
             conversationHistory.push({ role: 'model', parts: [{ text: firstQuestion }] });
             addMessageToChat(firstQuestion, 'ai');
@@ -235,38 +307,20 @@
         async function handleUserResponse() {
             const userResponse = chatInput.value.trim();
             if (!userResponse) return;
-
             toggleChatInput(true);
             addMessageToChat(userResponse, 'user');
             conversationHistory.push({ role: 'user', parts: [{ text: userResponse }] });
             chatInput.value = '';
 
-            const questionCount = conversationHistory.filter(m => m.role === 'model').length;
-            if (questionCount >= MAX_QUESTIONS) {
+            if (conversationHistory.filter(m => m.role === 'model').length >= MAX_QUESTIONS) {
+                showScreen('analysis');
                 endInterview();
                 return;
             }
 
-            // Add a "thinking" indicator
-            const thinkingBubble = document.createElement('div');
-            thinkingBubble.classList.add('chat-bubble', 'chat-bubble-ai', 'self-start');
-            thinkingBubble.innerHTML = '<div class="flex items-center gap-2"><span>Thinking...</span><div class="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div></div>';
-            chatWindow.appendChild(thinkingBubble);
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-
-            const prompt = `
-                You are a senior product manager continuing an interview. Below is the conversation history.
-                Your task is to ask the next logical follow-up question. Keep your questions concise and focused.
-                Do not repeat questions. Dig deeper into the candidate's last response.
-                Just ask the single next question directly.
-
-                --- CONVERSATION HISTORY ---
-                ${conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n')}
-            `;
-
+            const thinkingBubble = addMessageToChat('Thinking...', 'ai', true);
+            const prompt = `You are an expert interviewer for a "${userContext.role}" (${userContext.experience}) position. Below is the conversation history. Ask the next logical follow-up question. Dig deeper into the candidate's last response. Keep it concise. Just ask the single next question. HISTORY:\n${conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n')}`;
             const nextQuestion = await callGeminiAPI(prompt);
-            
-            // Remove the "thinking" indicator and add the real question
             chatWindow.removeChild(thinkingBubble);
             conversationHistory.push({ role: 'model', parts: [{ text: nextQuestion }] });
             addMessageToChat(nextQuestion, 'ai');
@@ -274,164 +328,113 @@
         }
 
         async function endInterview() {
+            clearInterval(interviewTimer);
             toggleChatInput(true);
-            endInterviewBtn.disabled = true;
-            interviewSection.classList.add('hidden');
-            feedbackSection.classList.remove('hidden');
-
             await runAssemblyLine();
         }
 
-        // --- The "Assembly Line" ---
+        // --- Analysis & Feedback (Assembly Line) ---
         async function runAssemblyLine() {
             const transcript = conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n\n');
-            
-            // These are our "Specialists". We run them in parallel.
-            const specialistPromises = [
-                runProductSenseAnalyst(transcript),
-                runExecutionAnalyst(transcript),
-                runCommunicationAnalyst(transcript),
-                runBehavioralAnalyst(transcript)
-            ];
-
-            const specialistReports = await Promise.all(specialistPromises);
-
-            // Now, we run the final "Synthesis" stage.
-            const finalReport = await runSynthesis(specialistReports);
-
-            analysisLoader.classList.add('hidden');
-            feedbackContent.classList.remove('hidden');
-            // Use a simple markdown-to-html converter for better formatting
+            const specialistReports = await Promise.all([
+                runProductSenseAnalyst(transcript), runExecutionAnalyst(transcript),
+                runCommunicationAnalyst(transcript), runBehavioralAnalyst(transcript)
+            ]);
+            const finalReport = await runSynthesis(specialistReports, transcript);
+            showScreen('feedback');
             feedbackOutput.innerHTML = simpleMarkdownToHtml(finalReport);
         }
 
-        // --- Specialist Roles ---
+        function runProductSenseAnalyst(t) { return callGeminiAPI(`You are a Product Sense Analyst. Evaluate the candidate's product thinking in this transcript for a "${userContext.role}" role. Focus on user empathy, problem framing, and solution creativity. Provide a concise report with examples. TRANSCRIPT:\n${t}`); }
+        function runExecutionAnalyst(t) { return callGeminiAPI(`You are a Product Execution Analyst. Evaluate the candidate's ability to get things done in this transcript for a "${userContext.role}" role. Focus on prioritization, stakeholder management, and data-driven decisions. Provide a concise report with examples. TRANSCRIPT:\n${t}`); }
+        function runCommunicationAnalyst(t) { return callGeminiAPI(`You are a Communication Coach. Evaluate the candidate's communication style in this transcript for a "${userContext.role}" role. Focus on structure (STAR method), clarity, and conciseness. Provide a concise report with examples. TRANSCRIPT:\n${t}`); }
+        function runBehavioralAnalyst(t) { return callGeminiAPI(`You are a Behavioral Analyst. Evaluate the candidate's collaboration and leadership qualities in this transcript for a "${userContext.role}" role. Focus on teamwork, influence, and self-awareness. Provide a concise report with examples. TRANSCRIPT:\n${t}`); }
         
-        function runProductSenseAnalyst(transcript) {
-            const prompt = `
-                You are an expert Product Sense Analyst. Your job is to evaluate a candidate's product thinking based on an interview transcript.
-                Analyze the following transcript and provide a concise report covering:
-                1.  **User Empathy:** Did the candidate demonstrate a deep understanding of user needs and problems?
-                2.  **Problem Framing:** How well did they define and break down the problem space?
-                3.  **Solution Creativity:** Were their proposed solutions innovative and well-reasoned?
-                4.  **Business Acumen:** Did they connect product decisions to business goals and metrics?
-                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
+        async function runSynthesis(reports, transcript) {
+            const combinedReports = `--- SPECIALIST REPORTS ---\nProduct Sense:\n${reports[0]}\n\nExecution:\n${reports[1]}\n\nCommunication:\n${reports[2]}\n\nBehavioral:\n${reports[3]}`;
+            const prompt = `You are an expert interview coach synthesizing feedback for a candidate applying for a "${userContext.role}" (${userContext.experience}) position. Generate a "3-2-1" feedback report based on the specialist analyses. The tone must be constructive and encouraging. Use markdown for formatting.
 
-                --- INTERVIEW TRANSCRIPT ---
-                ${transcript}
-            `;
+The report MUST follow this structure EXACTLY:
+
+### Overall Score: [Provide a score out of 100 and a qualitative label, e.g., "85/100 (Excellent)"]
+
+### Top 3 Wins
+- **[Win 1]:** [Briefly state the strength, e.g., "Excellent use of the STAR method."]
+- **[Win 2]:** [Briefly state the strength, e.g., "Strong, confident vocal delivery."]
+- **[Win 3]:** [Briefly state the strength, e.g., "Directly addressed key skills from the job description."]
+
+### Top 2 Growth Areas
+- **[Growth Area 1]:** [State the area, explain its importance, and give a concrete suggestion. e.g., "Quantify Impact: Your answer on project management was good, but could be strengthened by adding specific metrics. For PMs, this demonstrates a data-driven mindset. Try rephrasing your answer to include numbers like 'increased user engagement by 15%'."]
+- **[Growth Area 2]:** [State the area, explain its importance, and give a concrete suggestion.]
+
+### Your #1 Priority for Next Time
+**[Your #1 Priority]:** [Provide a single, clear, actionable directive for the candidate to focus on in their next practice session.]
+
+<details>
+<summary class="font-semibold cursor-pointer text-blue-600 hover:underline">Deep Dive: Full Transcript & Analysis</summary>
+<div class="mt-4 p-4 bg-gray-50 rounded-lg border">
+<h4>Full Transcript</h4>
+<p class="text-sm whitespace-pre-wrap">${transcript.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+<h4 class="mt-4">Content Analysis (Keywords from JD)</h4>
+<p class="text-sm">Coming soon...</p>
+<h4 class="mt-4">Communication Analysis</h4>
+<p class="text-sm">Pace, filler words, and tone analysis coming soon...</p>
+</div>
+</details>
+
+--- SPECIALIST REPORTS FOR YOUR REFERENCE ---
+${combinedReports}`;
             return callGeminiAPI(prompt);
         }
 
-        function runExecutionAnalyst(transcript) {
-            const prompt = `
-                You are an expert Product Execution Analyst. Your job is to evaluate a candidate's ability to get things done based on an interview transcript.
-                Analyze the following transcript and provide a concise report covering:
-                1.  **Prioritization:** Did the candidate use a clear framework for making trade-offs?
-                2.  **Stakeholder Management:** How did they describe working with engineering, design, and other teams?
-                3.  **Data-Driven Decisions:** Did they mention using data to inform their decisions or measure success?
-                4.  **Pragmatism:** Did they show an understanding of shipping iteratively and handling constraints?
-                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
-
-                --- INTERVIEW TRANSCRIPT ---
-                ${transcript}
-            `;
-            return callGeminiAPI(prompt);
-        }
-
-        function runCommunicationAnalyst(transcript) {
-            const prompt = `
-                You are an expert Communication Coach. Your job is to evaluate a candidate's communication style and clarity based on an interview transcript.
-                Analyze the following transcript and provide a concise report covering:
-                1.  **Structure:** Were the answers well-structured (e.g., using STAR, CIRCLES, or other frameworks)? Were they easy to follow?
-                2.  **Clarity & Conciseness:** Was the language clear and to the point, or was it rambling and full of jargon?
-                3.  **Active Listening:** Based on the follow-ups, did the candidate appear to listen carefully to the questions?
-                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
-
-                --- INTERVIEW TRANSCRIPT ---
-                ${transcript}
-            `;
-            return callGeminiAPI(prompt);
-        }
-
-        function runBehavioralAnalyst(transcript) {
-            const prompt = `
-                You are an expert Behavioral Analyst, focusing on collaboration and leadership qualities for Product Managers.
-                Analyze the following transcript and provide a concise report covering:
-                1.  **Collaboration:** How did the candidate describe their interactions with team members? Did they sound like a team player?
-                2.  **Leadership & Influence:** Did they provide examples of leading without authority? How did they influence others?
-                3.  **Self-Awareness & Growth:** Did they show humility and an ability to learn from past mistakes?
-                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
-
-                --- INTERVIEW TRANSCRIPT ---
-                ${transcript}
-            `;
-            return callGeminiAPI(prompt);
-        }
-
-        // --- Synthesis Stage ---
-        function runSynthesis(reports) {
-            const combinedReports = `
-                --- PRODUCT SENSE ANALYSIS ---
-                ${reports[0]}
-
-                --- EXECUTION ANALYSIS ---
-                ${reports[1]}
-
-                --- COMMUNICATION ANALYSIS ---
-                ${reports[2]}
-
-                --- BEHAVIORAL ANALYSIS ---
-                ${reports[3]}
-            `;
-
-            const prompt = `
-                You are a senior hiring manager and an expert interview coach for Product Managers. You have just received a set of analyses from your specialist team about a candidate's interview performance.
-                Your task is to synthesize these reports into a single, comprehensive, and actionable feedback document for the candidate.
-                The tone should be constructive, encouraging, and highly specific.
-
-                Structure your feedback as follows, using markdown for formatting:
-                
-                ### Overall Summary
-                Start with a brief, high-level summary of the candidate's performance.
-                
-                ### Strengths
-                Create a bulleted list of 2-3 key strengths. For each strength, cite a specific example or observation from the specialist reports.
-                
-                ### Areas for Improvement
-                This is the most important section. Create a bulleted list of 2-3 key areas for improvement. For each point, do the following:
-                1.  Clearly state the area for improvement.
-                2.  Explain *why* it's important for a PM.
-                3.  Provide a concrete, actionable suggestion for how the candidate can improve. This could be a book to read, a framework to practice, or a way to reframe their thinking.
-                
-                Do not just repeat the specialist reports. Your value is in synthesizing them into a cohesive and prescriptive plan for the candidate.
-
-                --- SPECIALIST REPORTS ---
-                ${combinedReports}
-            `;
-            return callGeminiAPI(prompt);
-        }
-
-        // --- Utility for basic markdown rendering ---
-        function simpleMarkdownToHtml(text) {
-            return text
-                .replace(/^### (.*$)/gim, '<h3 class="text-xl font-semibold mt-4 mb-2">$1</h3>')
-                .replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold mt-6 mb-3">$1</h2>')
-                .replace(/^\* (.*$)/gim, '<li class="ml-6 mb-2">$1</li>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br>');
-        }
-
-        // --- Event Listeners ---
-        startInterviewBtn.addEventListener('click', startInterview);
-        sendBtn.addEventListener('click', handleUserResponse);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleUserResponse();
+        // --- Utility Functions ---
+        async function callGeminiAPI(prompt, maxRetries = 3) { /* ... same as before ... */ 
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { temperature: 0.6, topP: 0.9, maxOutputTokens: 4096 } };
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+                    const result = await response.json();
+                    if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts) { return result.candidates[0].content.parts[0].text; }
+                    else { console.error("API response missing content:", result); return "I'm sorry, I couldn't generate a response."; }
+                } catch (error) {
+                    console.error(`API call attempt ${attempt + 1} failed:`, error);
+                    attempt++;
+                    if (attempt >= maxRetries) return "I'm having trouble connecting to my brain right now. Please try again later.";
+                    await new Promise(res => setTimeout(res, Math.pow(2, attempt) * 1000));
+                }
             }
-        });
-        endInterviewBtn.addEventListener('click', endInterview);
+        }
+        function addMessageToChat(message, sender, isThinking = false) { /* ... same as before ... */ 
+            const bubble = document.createElement('div');
+            bubble.classList.add('chat-bubble', sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai', 'self-start');
+            if(sender === 'user') bubble.classList.add('self-end');
+            if (isThinking) { bubble.innerHTML = `<div class="flex items-center gap-2"><span>Thinking...</span><div class="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div></div>`; }
+            else { bubble.textContent = message; }
+            chatWindow.appendChild(bubble);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+            return bubble;
+        }
+        function toggleChatInput(disabled) { /* ... same as before ... */ 
+            chatInput.disabled = disabled;
+            document.getElementById('send-btn').disabled = disabled;
+            if (!disabled) chatInput.focus();
+        }
+        function simpleMarkdownToHtml(text) { /* ... same as before ... */ 
+             return text
+                .replace(/^### (.*$)/gim, '<h3 class="text-xl font-semibold mt-6 mb-2 border-b pb-2">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold mt-8 mb-4">$1</h2>')
+                .replace(/^\* \*\*(.*?)\*\*:/gim, '<li><strong>$1:</strong>')
+                .replace(/^\* (.*$)/gim, '<li class="ml-6 mb-2 list-disc">$1</li>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>')
+                .replace(/<br><li/g, '<li')
+                .replace(/<br><details/g, '<details>');
+        }
 
+        // --- Initial Load ---
+        showScreen('homepage');
     </script>
 </body>
 </html>
