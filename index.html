@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepAI - PM Interview Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chat-bubble {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            word-wrap: break-word;
+        }
+        .chat-bubble-user {
+            background-color: #2563eb;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .chat-bubble-ai {
+            background-color: #e5e7eb;
+            color: #1f2937;
+            border-bottom-left-radius: 4px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto max-w-4xl p-4">
+        <header class="text-center my-6">
+            <h1 class="text-4xl font-bold text-gray-900">PrepAI Weekend Prototype</h1>
+            <p class="text-lg text-gray-600 mt-2">A high-fidelity PM interview simulator with an actionable feedback loop.</p>
+        </header>
+
+        <!-- Step 1: User Context Input -->
+        <div id="context-section" class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-semibold mb-4">1. Provide Context</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label for="resume" class="block text-sm font-medium text-gray-700 mb-1">Paste Your Resume</label>
+                    <textarea id="resume" rows="10" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste your full resume here..."></textarea>
+                </div>
+                <div>
+                    <label for="job-desc" class="block text-sm font-medium text-gray-700 mb-1">Paste Target Job Description</label>
+                    <textarea id="job-desc" rows="10" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Paste the job description you're targeting..."></textarea>
+                </div>
+            </div>
+            <button id="start-interview-btn" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400">
+                Start Interview
+            </button>
+        </div>
+
+        <!-- Step 2: Interview Chat -->
+        <div id="interview-section" class="hidden bg-white p-6 rounded-lg shadow-md mb-6">
+            <h2 class="text-2xl font-semibold mb-4">2. Your Interview</h2>
+            <div id="chat-window" class="h-96 border border-gray-200 rounded-lg p-4 overflow-y-auto flex flex-col gap-4 mb-4">
+                <!-- Chat messages will be appended here -->
+            </div>
+            <div class="flex gap-4">
+                <input type="text" id="chat-input" class="flex-grow p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500" placeholder="Type your answer..." disabled>
+                <button id="send-btn" class="bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300 disabled:bg-gray-400" disabled>Send</button>
+            </div>
+            <button id="end-interview-btn" class="mt-4 w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700 transition duration-300">
+                End Interview & Get Feedback
+            </button>
+        </div>
+
+        <!-- Step 3: Analysis & Feedback -->
+        <div id="feedback-section" class="hidden">
+            <div id="analysis-loader" class="text-center bg-white p-6 rounded-lg shadow-md">
+                 <h2 class="text-2xl font-semibold mb-4">3. Analyzing Your Interview...</h2>
+                 <p class="text-gray-600 mb-6">The "Assembly Line" is now processing your conversation. Our committee of AI specialists is evaluating your performance.</p>
+                 <div class="flex justify-center">
+                    <div class="loader"></div>
+                 </div>
+            </div>
+            <div id="feedback-content" class="hidden bg-white p-6 rounded-lg shadow-md">
+                <h2 class="text-2xl font-semibold mb-4">3. Your Actionable Feedback</h2>
+                <div id="feedback-output" class="prose max-w-none"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const contextSection = document.getElementById('context-section');
+        const interviewSection = document.getElementById('interview-section');
+        const feedbackSection = document.getElementById('feedback-section');
+        const analysisLoader = document.getElementById('analysis-loader');
+        const feedbackContent = document.getElementById('feedback-content');
+        
+        const startInterviewBtn = document.getElementById('start-interview-btn');
+        const endInterviewBtn = document.getElementById('end-interview-btn');
+        const sendBtn = document.getElementById('send-btn');
+        
+        const resumeInput = document.getElementById('resume');
+        const jobDescInput = document.getElementById('job-desc');
+        const chatInput = document.getElementById('chat-input');
+        const chatWindow = document.getElementById('chat-window');
+        const feedbackOutput = document.getElementById('feedback-output');
+
+        // --- State Management ---
+        let conversationHistory = [];
+        let userContext = {};
+        const MAX_QUESTIONS = 5; // For a weekend project, limit the conversation length
+
+        // --- Gemini API Configuration ---
+        // IMPORTANT: In a real application, the API key should be handled on a secure backend.
+        // For this self-contained prototype, we'll define it here.
+        // Canvas will automatically provide the key in runtime.
+        const API_KEY = ""; 
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${API_KEY}`;
+        
+        /**
+         * A generic function to call the Gemini API.
+         * Implements exponential backoff for retries.
+         * @param {string} prompt The prompt to send to the model.
+         * @param {number} maxRetries The maximum number of retries.
+         * @returns {Promise<string>} The generated text from the model.
+         */
+        async function callGeminiAPI(prompt, maxRetries = 3) {
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {
+                    temperature: 0.6,
+                    topP: 0.9,
+                    maxOutputTokens: 2048,
+                }
+            };
+
+            let attempt = 0;
+            while (attempt < maxRetries) {
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        return result.candidates[0].content.parts[0].text;
+                    } else {
+                        // Handle cases of blocked content or unexpected response structure
+                        console.error("API response missing content:", result);
+                        return "I'm sorry, I couldn't generate a response due to content restrictions. Let's try a different question.";
+                    }
+                } catch (error) {
+                    console.error(`API call attempt ${attempt + 1} failed:`, error);
+                    attempt++;
+                    if (attempt >= maxRetries) {
+                        return "I'm having trouble connecting to my brain right now. Please try again later.";
+                    }
+                    const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+                    await new Promise(res => setTimeout(res, delay));
+                }
+            }
+        }
+
+        // --- UI Functions ---
+        function addMessageToChat(message, sender) {
+            const bubble = document.createElement('div');
+            bubble.classList.add('chat-bubble', sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai');
+            bubble.classList.add(sender === 'user' ? 'self-end' : 'self-start');
+            bubble.textContent = message;
+            chatWindow.appendChild(bubble);
+            chatWindow.scrollTop = chatWindow.scrollHeight; // Auto-scroll to bottom
+        }
+
+        function toggleChatInput(disabled) {
+            chatInput.disabled = disabled;
+            sendBtn.disabled = disabled;
+            if (!disabled) {
+                chatInput.focus();
+            }
+        }
+
+        // --- Interview Logic ---
+        async function startInterview() {
+            userContext.resume = resumeInput.value;
+            userContext.jobDesc = jobDescInput.value;
+
+            if (!userContext.resume.trim() || !userContext.jobDesc.trim()) {
+                alert('Please provide both your resume and a target job description.');
+                return;
+            }
+
+            startInterviewBtn.disabled = true;
+            startInterviewBtn.textContent = 'Starting...';
+
+            contextSection.classList.add('hidden');
+            interviewSection.classList.remove('hidden');
+
+            const prompt = `
+                You are a senior product manager hiring for the role described below. Your task is to start an interview with a candidate whose resume is also provided.
+                Ask a single, insightful opening question based on their resume that probes their experience relevant to the job description.
+                Do not add any preamble like "Hello" or "Thanks for coming in". Just ask the question directly.
+
+                --- JOB DESCRIPTION ---
+                ${userContext.jobDesc}
+
+                --- CANDIDATE RESUME ---
+                ${userContext.resume}
+            `;
+            
+            const firstQuestion = await callGeminiAPI(prompt);
+            conversationHistory.push({ role: 'model', parts: [{ text: firstQuestion }] });
+            addMessageToChat(firstQuestion, 'ai');
+            toggleChatInput(false);
+        }
+
+        async function handleUserResponse() {
+            const userResponse = chatInput.value.trim();
+            if (!userResponse) return;
+
+            toggleChatInput(true);
+            addMessageToChat(userResponse, 'user');
+            conversationHistory.push({ role: 'user', parts: [{ text: userResponse }] });
+            chatInput.value = '';
+
+            const questionCount = conversationHistory.filter(m => m.role === 'model').length;
+            if (questionCount >= MAX_QUESTIONS) {
+                endInterview();
+                return;
+            }
+
+            // Add a "thinking" indicator
+            const thinkingBubble = document.createElement('div');
+            thinkingBubble.classList.add('chat-bubble', 'chat-bubble-ai', 'self-start');
+            thinkingBubble.innerHTML = '<div class="flex items-center gap-2"><span>Thinking...</span><div class="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div></div>';
+            chatWindow.appendChild(thinkingBubble);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+
+            const prompt = `
+                You are a senior product manager continuing an interview. Below is the conversation history.
+                Your task is to ask the next logical follow-up question. Keep your questions concise and focused.
+                Do not repeat questions. Dig deeper into the candidate's last response.
+                Just ask the single next question directly.
+
+                --- CONVERSATION HISTORY ---
+                ${conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n')}
+            `;
+
+            const nextQuestion = await callGeminiAPI(prompt);
+            
+            // Remove the "thinking" indicator and add the real question
+            chatWindow.removeChild(thinkingBubble);
+            conversationHistory.push({ role: 'model', parts: [{ text: nextQuestion }] });
+            addMessageToChat(nextQuestion, 'ai');
+            toggleChatInput(false);
+        }
+
+        async function endInterview() {
+            toggleChatInput(true);
+            endInterviewBtn.disabled = true;
+            interviewSection.classList.add('hidden');
+            feedbackSection.classList.remove('hidden');
+
+            await runAssemblyLine();
+        }
+
+        // --- The "Assembly Line" ---
+        async function runAssemblyLine() {
+            const transcript = conversationHistory.map(m => `${m.role === 'model' ? 'Interviewer' : 'Candidate'}: ${m.parts[0].text}`).join('\n\n');
+            
+            // These are our "Specialists". We run them in parallel.
+            const specialistPromises = [
+                runProductSenseAnalyst(transcript),
+                runExecutionAnalyst(transcript),
+                runCommunicationAnalyst(transcript),
+                runBehavioralAnalyst(transcript)
+            ];
+
+            const specialistReports = await Promise.all(specialistPromises);
+
+            // Now, we run the final "Synthesis" stage.
+            const finalReport = await runSynthesis(specialistReports);
+
+            analysisLoader.classList.add('hidden');
+            feedbackContent.classList.remove('hidden');
+            // Use a simple markdown-to-html converter for better formatting
+            feedbackOutput.innerHTML = simpleMarkdownToHtml(finalReport);
+        }
+
+        // --- Specialist Roles ---
+        
+        function runProductSenseAnalyst(transcript) {
+            const prompt = `
+                You are an expert Product Sense Analyst. Your job is to evaluate a candidate's product thinking based on an interview transcript.
+                Analyze the following transcript and provide a concise report covering:
+                1.  **User Empathy:** Did the candidate demonstrate a deep understanding of user needs and problems?
+                2.  **Problem Framing:** How well did they define and break down the problem space?
+                3.  **Solution Creativity:** Were their proposed solutions innovative and well-reasoned?
+                4.  **Business Acumen:** Did they connect product decisions to business goals and metrics?
+                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
+
+                --- INTERVIEW TRANSCRIPT ---
+                ${transcript}
+            `;
+            return callGeminiAPI(prompt);
+        }
+
+        function runExecutionAnalyst(transcript) {
+            const prompt = `
+                You are an expert Product Execution Analyst. Your job is to evaluate a candidate's ability to get things done based on an interview transcript.
+                Analyze the following transcript and provide a concise report covering:
+                1.  **Prioritization:** Did the candidate use a clear framework for making trade-offs?
+                2.  **Stakeholder Management:** How did they describe working with engineering, design, and other teams?
+                3.  **Data-Driven Decisions:** Did they mention using data to inform their decisions or measure success?
+                4.  **Pragmatism:** Did they show an understanding of shipping iteratively and handling constraints?
+                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
+
+                --- INTERVIEW TRANSCRIPT ---
+                ${transcript}
+            `;
+            return callGeminiAPI(prompt);
+        }
+
+        function runCommunicationAnalyst(transcript) {
+            const prompt = `
+                You are an expert Communication Coach. Your job is to evaluate a candidate's communication style and clarity based on an interview transcript.
+                Analyze the following transcript and provide a concise report covering:
+                1.  **Structure:** Were the answers well-structured (e.g., using STAR, CIRCLES, or other frameworks)? Were they easy to follow?
+                2.  **Clarity & Conciseness:** Was the language clear and to the point, or was it rambling and full of jargon?
+                3.  **Active Listening:** Based on the follow-ups, did the candidate appear to listen carefully to the questions?
+                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
+
+                --- INTERVIEW TRANSCRIPT ---
+                ${transcript}
+            `;
+            return callGeminiAPI(prompt);
+        }
+
+        function runBehavioralAnalyst(transcript) {
+            const prompt = `
+                You are an expert Behavioral Analyst, focusing on collaboration and leadership qualities for Product Managers.
+                Analyze the following transcript and provide a concise report covering:
+                1.  **Collaboration:** How did the candidate describe their interactions with team members? Did they sound like a team player?
+                2.  **Leadership & Influence:** Did they provide examples of leading without authority? How did they influence others?
+                3.  **Self-Awareness & Growth:** Did they show humility and an ability to learn from past mistakes?
+                Provide specific examples from the transcript to support your analysis. Format your output as a short report.
+
+                --- INTERVIEW TRANSCRIPT ---
+                ${transcript}
+            `;
+            return callGeminiAPI(prompt);
+        }
+
+        // --- Synthesis Stage ---
+        function runSynthesis(reports) {
+            const combinedReports = `
+                --- PRODUCT SENSE ANALYSIS ---
+                ${reports[0]}
+
+                --- EXECUTION ANALYSIS ---
+                ${reports[1]}
+
+                --- COMMUNICATION ANALYSIS ---
+                ${reports[2]}
+
+                --- BEHAVIORAL ANALYSIS ---
+                ${reports[3]}
+            `;
+
+            const prompt = `
+                You are a senior hiring manager and an expert interview coach for Product Managers. You have just received a set of analyses from your specialist team about a candidate's interview performance.
+                Your task is to synthesize these reports into a single, comprehensive, and actionable feedback document for the candidate.
+                The tone should be constructive, encouraging, and highly specific.
+
+                Structure your feedback as follows, using markdown for formatting:
+                
+                ### Overall Summary
+                Start with a brief, high-level summary of the candidate's performance.
+                
+                ### Strengths
+                Create a bulleted list of 2-3 key strengths. For each strength, cite a specific example or observation from the specialist reports.
+                
+                ### Areas for Improvement
+                This is the most important section. Create a bulleted list of 2-3 key areas for improvement. For each point, do the following:
+                1.  Clearly state the area for improvement.
+                2.  Explain *why* it's important for a PM.
+                3.  Provide a concrete, actionable suggestion for how the candidate can improve. This could be a book to read, a framework to practice, or a way to reframe their thinking.
+                
+                Do not just repeat the specialist reports. Your value is in synthesizing them into a cohesive and prescriptive plan for the candidate.
+
+                --- SPECIALIST REPORTS ---
+                ${combinedReports}
+            `;
+            return callGeminiAPI(prompt);
+        }
+
+        // --- Utility for basic markdown rendering ---
+        function simpleMarkdownToHtml(text) {
+            return text
+                .replace(/^### (.*$)/gim, '<h3 class="text-xl font-semibold mt-4 mb-2">$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2 class="text-2xl font-bold mt-6 mb-3">$1</h2>')
+                .replace(/^\* (.*$)/gim, '<li class="ml-6 mb-2">$1</li>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+        }
+
+        // --- Event Listeners ---
+        startInterviewBtn.addEventListener('click', startInterview);
+        sendBtn.addEventListener('click', handleUserResponse);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleUserResponse();
+            }
+        });
+        endInterviewBtn.addEventListener('click', endInterview);
+
+    </script>
+</body>
+</html>
