@@ -156,23 +156,61 @@ document.getElementById('end-interview-btn').addEventListener('click', endInterv
  * API Call 2 & 3: Complete interview and poll for report
  * This function will be fully implemented in Step 4
  */
+// In app.js, replace the entire endInterview function and add pollForReport
+
 async function endInterview() {
     showScreen('analysis');
-    console.log("Interview ended. Preparing to send transcript for analysis.");
-    console.log("Final Transcript:", transcript);
+    console.log("Interview ended. Sending transcript for analysis...");
 
-    // --- THIS PART WILL BE BUILT IN STEP 4 ---
-    // For now, we simulate the process and show a placeholder.
-    
-    // 1. Call the 'complete' endpoint (won't work yet)
-    // await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}/complete`, {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ transcript: transcript })
-    // });
+    try {
+        // API Call 2: Tell the backend to start the analysis
+        const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcript: transcript })
+        });
 
-    // 2. Poll the 'report' endpoint (won't work yet)
-    // pollForReport();
+        if (!response.ok) throw new Error('Failed to start analysis');
+
+        // Start polling for the report
+        pollForReport();
+
+    } catch (error) {
+        console.error(error);
+        alert('Could not submit interview for analysis.');
+    }
+}
+
+function pollForReport() {
+    console.log("Polling for report...");
+
+    const intervalId = setInterval(async () => {
+        try {
+            const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}/report`);
+            const result = await response.json();
+
+            console.log("Poll status:", result.status);
+
+            if (result.status === 'report-ready') {
+                clearInterval(intervalId); // Stop polling
+                showScreen('feedback');
+                feedbackOutput.innerHTML = `
+                    <h3 class="text-xl font-semibold">Analysis Complete!</h3>
+                    <pre class="mt-4 p-4 bg-gray-100 rounded text-sm whitespace-pre-wrap">${JSON.stringify(result.data, null, 2)}</pre>
+                `;
+            } else if (result.status === 'failed') {
+                clearInterval(intervalId);
+                alert('Analysis failed. Please try again.');
+            }
+            // If status is 'generating-report', do nothing and let it poll again.
+
+        } catch (error) {
+            console.error('Polling error:', error);
+            clearInterval(intervalId); // Stop polling on error
+        }
+    }, 5000); // Check every 5 seconds
+}
+
 
     // --- SIMULATION FOR STEP 3 ---
     setTimeout(() => {
