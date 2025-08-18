@@ -1,0 +1,11 @@
+# Python virtual environment
+venv/
+
+# Python cache files
+__pycache__/
+
+# macOS specific files
+.DS_Store
+
+# Ignore file with hardcoded API key
+tasks.py
