@@ -86,7 +86,7 @@ async function startInterview() {
     addMessageToChat("Hello! I'm your AI interviewer. I'm just getting the first question ready...", 'ai');
 
     // Replace this with your live Render URL or local URL for testing
-    const API_BASE_URL = "http://127.0.0.1:8000"; 
+    const API_BASE_URL = "https://prepai-api.onrender.com"; 
 
     try {
         const response = await fetch(`${API_BASE_URL}/api/interviews`, {
