@@ -8,7 +8,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromService:
-          type: postgres # CORRECTED
+          type: psql 
           name: prepai-db
       - key: REDIS_URL
         fromService:
@@ -26,7 +26,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromService:
-          type: postgres # CORRECTED
+          type: psql 
           name: prepai-db
       - key: REDIS_URL
         fromService:
@@ -36,7 +36,7 @@ services:
         sync: false
 
   # 3. The PostgreSQL Database
-  - type: postgres # CORRECTED
+  - type: psql 
     name: prepai-db
     plan: free
 
