@@ -8,14 +8,14 @@ services:
     envVars:
       - key: DATABASE_URL
         fromService:
-          type: psql
+          type: postgres # CORRECTED
           name: prepai-db
       - key: REDIS_URL
         fromService:
           type: redis
           name: prepai-redis
       - key: GOOGLE_API_KEY
-        sync: false # This will be set in the Render dashboard
+        sync: false
 
   # 2. The Celery Background Worker
   - type: worker
@@ -26,7 +26,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromService:
-          type: psql
+          type: postgres # CORRECTED
           name: prepai-db
       - key: REDIS_URL
         fromService:
@@ -36,7 +36,7 @@ services:
         sync: false
 
   # 3. The PostgreSQL Database
-  - type: psql
+  - type: postgres # CORRECTED
     name: prepai-db
     plan: free
 
