@@ -18,15 +18,13 @@ const screens = {
     feedback: document.getElementById('feedback-screen'),
 };
 
-// Input Elements
 const roleInput = document.getElementById('role-input');
-const skillsOptions = document.getElementById('skills-options');
 const chatInput = document.getElementById('chat-input');
 const chatWindow = document.getElementById('chat-window');
 const feedbackOutput = document.getElementById('feedback-output');
 const sendBtn = document.getElementById('send-btn');
 
-// --- Navigation & Helper Functions ---
+// --- Helper Functions ---
 function showScreen(screenKey) {
     Object.values(screens).forEach(screen => screen.classList.add('hidden'));
     if (screens[screenKey]) {
@@ -53,13 +51,13 @@ function displayCurrentQuestion() {
         sendBtn.disabled = false;
         chatInput.focus();
     } else {
-        // No more questions, end the interview
-        endInterview();
+        addMessageToChat("That was the last question. Click the 'End Interview' button to get your feedback.", 'ai');
+        chatInput.disabled = true;
+        sendBtn.disabled = true;
     }
 }
 
-
-// --- Onboarding Flow (Adapted from your HTML) ---
+// --- Onboarding Flow ---
 document.getElementById('start-onboarding-btn').addEventListener('click', () => showScreen('onboardingRole'));
 
 document.getElementById('role-next-btn').addEventListener('click', () => {
@@ -70,38 +68,34 @@ document.getElementById('role-next-btn').addEventListener('click', () => {
 
 function handleExperienceSelect(level) {
     interviewConfig.seniority = level;
-    // For our MVP, let's pre-select some skills and go to the next step
-    // In a real app, you'd populate the skills screen dynamically.
+    // For our MVP, we'll pre-select skills and proceed.
     interviewConfig.skills = ["Product Sense", "Metrics"]; 
     showScreen('dashboard');
     document.getElementById('dashboard-role-company').textContent = `For a ${interviewConfig.role} role (${interviewConfig.seniority} level).`;
     document.getElementById('key-skills-list').innerHTML = interviewConfig.skills.map(skill => `<li>${skill}</li>`).join('');
 }
-// Attach this function to the buttons in your HTML (it was there before)
+// Make the function globally accessible for the onclick attributes in the HTML
 window.handleExperienceSelect = handleExperienceSelect; 
 
 document.getElementById('go-to-interview-prep-btn').addEventListener('click', () => showScreen('interviewPrep'));
 document.getElementById('start-interview-btn').addEventListener('click', startInterview);
 
-
 // --- Core API Interaction Logic ---
-
-/**
- * API Call 1: Start the interview
- * This is the main function that contacts our backend.
- */
 async function startInterview() {
     showScreen('interview');
     addMessageToChat("Hello! I'm your AI interviewer. I'm just getting the first question ready...", 'ai');
 
+    // Replace this with your live Render URL or local URL for testing
+    const API_BASE_URL = "http://127.0.0.1:8000"; 
+
     try {
-        const response = await fetch('http://127.0.0.1:8000/api/interviews', {
+        const response = await fetch(`${API_BASE_URL}/api/interviews`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(interviewConfig)
         });
 
-        if (!response.ok) throw new Error(`Failed to start interview. Server responded with ${response.status}`);
+        if (!response.ok) throw new Error(`Server responded with ${response.status}`);
 
         const data = await response.json();
         interviewId = data.interview_id;
@@ -112,20 +106,16 @@ async function startInterview() {
 
     } catch (error) {
         console.error(error);
-        addMessageToChat('Error: Could not start the interview. Please ensure the backend server is running and try again.', 'ai');
+        addMessageToChat('Error: Could not start the interview. Please ensure the backend server is running and the API URL is correct, then refresh the page.', 'ai');
     }
 }
 
-/**
- * Handles user submitting an answer
- */
 function handleUserResponse() {
     const answer = chatInput.value.trim();
     if (!answer) return;
 
     addMessageToChat(answer, 'user');
     
-    // Save the Q&A to our transcript
     const currentQuestion = questions[currentQuestionIndex];
     transcript.push({
         question: currentQuestion.question_text,
@@ -138,10 +128,43 @@ function handleUserResponse() {
 
     currentQuestionIndex++;
     
-    // Display the next question after a short delay
     setTimeout(displayCurrentQuestion, 1000);
 }
 
+async function endInterview() {
+    showScreen('analysis');
+    console.log("Interview ended. Sending transcript and waiting for analysis...");
+
+    // Replace this with your live Render URL or local URL for testing
+    const API_BASE_URL = "http://127.0.0.1:8000"; 
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/interviews/${interviewId}/complete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcript: transcript })
+        });
+
+        if (!response.ok) {
+            throw new Error('Analysis request failed');
+        }
+
+        const result = await response.json();
+
+        showScreen('feedback');
+        feedbackOutput.innerHTML = `
+            <h3 class="text-xl font-semibold">Analysis Complete!</h3>
+            <pre class="mt-4 p-4 bg-gray-100 rounded text-sm whitespace-pre-wrap">${JSON.stringify(result.data, null, 2)}</pre>
+        `;
+
+    } catch (error) {
+        console.error(error);
+        alert('Could not get analysis. Please try again.');
+        showScreen('interview');
+    }
+}
+
+// --- Event Listeners ---
 sendBtn.addEventListener('click', handleUserResponse);
 chatInput.addEventListener('keydown', (e) => { 
     if (e.key === 'Enter' && !e.shiftKey && !e.target.disabled) {
@@ -151,77 +174,5 @@ chatInput.addEventListener('keydown', (e) => {
 });
 document.getElementById('end-interview-btn').addEventListener('click', endInterview);
 
-
-/**
- * API Call 2 & 3: Complete interview and poll for report
- * This function will be fully implemented in Step 4
- */
-// In app.js, replace the entire endInterview function and add pollForReport
-
-async function endInterview() {
-    showScreen('analysis');
-    console.log("Interview ended. Sending transcript for analysis...");
-
-    try {
-        // API Call 2: Tell the backend to start the analysis
-        const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}/complete`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ transcript: transcript })
-        });
-
-        if (!response.ok) throw new Error('Failed to start analysis');
-
-        // Start polling for the report
-        pollForReport();
-
-    } catch (error) {
-        console.error(error);
-        alert('Could not submit interview for analysis.');
-    }
-}
-
-function pollForReport() {
-    console.log("Polling for report...");
-
-    const intervalId = setInterval(async () => {
-        try {
-            const response = await fetch(`http://127.0.0.1:8000/api/interviews/${interviewId}/report`);
-            const result = await response.json();
-
-            console.log("Poll status:", result.status);
-
-            if (result.status === 'report-ready') {
-                clearInterval(intervalId); // Stop polling
-                showScreen('feedback');
-                feedbackOutput.innerHTML = `
-                    <h3 class="text-xl font-semibold">Analysis Complete!</h3>
-                    <pre class="mt-4 p-4 bg-gray-100 rounded text-sm whitespace-pre-wrap">${JSON.stringify(result.data, null, 2)}</pre>
-                `;
-            } else if (result.status === 'failed') {
-                clearInterval(intervalId);
-                alert('Analysis failed. Please try again.');
-            }
-            // If status is 'generating-report', do nothing and let it poll again.
-
-        } catch (error) {
-            console.error('Polling error:', error);
-            clearInterval(intervalId); // Stop polling on error
-        }
-    }, 5000); // Check every 5 seconds
-}
-
-
-    // --- SIMULATION FOR STEP 3 ---
-    setTimeout(() => {
-        showScreen('feedback');
-        feedbackOutput.innerHTML = `
-            <h3 class="text-xl font-semibold">Analysis Complete (Placeholder)</h3>
-            <p>Your interview transcript has been recorded. The backend logic to analyze it and generate a report will be built in Step 4.</p>
-            <pre class="mt-4 p-4 bg-gray-100 rounded text-sm whitespace-pre-wrap">${JSON.stringify(transcript, null, 2)}</pre>
-        `;
-    }, 5000); // Wait 5 seconds to simulate analysis
-}
-
-// Initial Load
+// --- Initial Load ---
 showScreen('homepage');
