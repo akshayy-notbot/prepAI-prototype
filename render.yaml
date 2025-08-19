@@ -7,6 +7,13 @@ services:
     region: oregon
     ipAllowList: []
     
+  # Redis Service (for Celery and session management)
+  - type: redis
+    name: prepai-redis
+    plan: free
+    region: oregon
+    maxmemoryPolicy: allkeys-lru
+    
   # FastAPI Backend
   - type: web
     name: prepai-api
@@ -17,12 +24,17 @@ services:
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        sync: false  # Use existing secret
       - key: DATABASE_URL
-        fromDatabase:
-          name: prepai-database
+        sync: false  # Use existing secret
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: prepai-redis
           property: connectionString
       - key: GOOGLE_API_KEY
-        sync: false  # You'll need to set this manually
+        sync: false  # Use existing secret
+      - key: ENVIRONMENT
+        value: production
     healthCheckPath: /health
     autoDeploy: true

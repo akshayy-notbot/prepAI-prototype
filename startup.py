@@ -21,7 +21,7 @@ def run_startup_checks():
     
     # Check environment variables
     print("🔍 Checking environment variables...")
-    required_vars = ['DATABASE_URL', 'GOOGLE_API_KEY']
+    required_vars = ['DATABASE_URL', 'GOOGLE_API_KEY', 'REDIS_URL']
     
     for var in required_vars:
         value = os.getenv(var)
@@ -63,6 +63,21 @@ def run_startup_checks():
     except Exception as e:
         print(f"❌ Failed to create database schema: {e}")
         return False
+    
+    # Test Redis connection
+    print("\n🔍 Testing Redis connection...")
+    try:
+        import redis
+        redis_url = os.getenv('REDIS_URL')
+        if redis_url:
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            redis_client.ping()
+            print("✅ Redis connection successful")
+        else:
+            print("⚠️  REDIS_URL not set")
+    except Exception as e:
+        print(f"❌ Redis connection failed: {e}")
+        print("⚠️  Some features may not work without Redis")
     
     # Verify tables exist
     print("\n🔍 Verifying database tables...")
