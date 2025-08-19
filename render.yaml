@@ -1,0 +1,28 @@
+services:
+  # PostgreSQL Database
+  - type: pserv
+    name: prepai-database
+    env: postgresql
+    plan: free
+    region: oregon
+    ipAllowList: []
+    
+  # FastAPI Backend
+  - type: web
+    name: prepai-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: prepai-database
+          property: connectionString
+      - key: GOOGLE_API_KEY
+        sync: false  # You'll need to set this manually
+    healthCheckPath: /docs
+    autoDeploy: true
