@@ -68,10 +68,15 @@ function establishConnection(sessionId) {
 // Check for updates via HTTP polling
 async function checkForUpdates(sessionId) {
     try {
-        const response = await fetch(`/api/interview-status/${sessionId}`);
+        const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
+        const response = await fetch(`${API_BASE_URL}/api/interview-status/${sessionId}`);
+        console.log('🔍 Polling for updates:', `${API_BASE_URL}/api/interview-status/${sessionId}`);
         if (response.ok) {
             const data = await response.json();
+            console.log('📊 Polling response:', data);
             handleInterviewUpdate(data);
+        } else {
+            console.log('⚠️ Polling response not OK:', response.status, response.statusText);
         }
     } catch (error) {
         console.error('❌ Error checking for updates:', error);
@@ -975,10 +980,15 @@ async function handleSubmitAnswer() {
     // 4. Send the answer to the backend via HTTP POST (clean approach)
     try {
         const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
+        console.log('🔗 Using API URL:', API_BASE_URL);
+        console.log('🔗 Full submit-answer URL:', `${API_BASE_URL}/api/submit-answer`);
+        console.log('🔗 Session ID:', sessionId);
+        console.log('🔗 Answer text:', answerText);
         const response = await fetch(`${API_BASE_URL}/api/submit-answer`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
             },
             body: JSON.stringify({
                 session_id: sessionId,
