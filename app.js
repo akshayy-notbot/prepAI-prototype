@@ -61,9 +61,8 @@ function establishConnection(sessionId) {
     console.log('✅ HTTP polling connection established');
     updateQuestionStatus('Connected to AI interviewer');
     
-    // Show typing indicator while waiting for first question
-    showInputLoadingState('typing');
-    updateQuestionStatus('AI is preparing your first question...');
+    // Note: First question display is handled in startInterview function
+    // Only show loading if no question was provided initially
 }
 
 // Check for updates via HTTP polling
@@ -661,6 +660,18 @@ async function startInterview() {
             interviewId = Date.now(); // Generate a simple ID for tracking
             
             console.log('🎯 Interview started with session ID:', sessionId);
+            
+            // Display the first question immediately if available
+            if (interviewResponse.first_question) {
+                console.log('📝 Displaying first question:', interviewResponse.first_question);
+                handleAIQuestion(interviewResponse.first_question);
+                hideQuestionLoading();
+                updateQuestionStatus('Question ready');
+            } else {
+                // If no first question, show loading and start polling
+                showInputLoadingState('typing');
+                updateQuestionStatus('AI is preparing your first question...');
+            }
             
             // A. Establish HTTP Polling Connection (WebSocket alternative for Render)
             establishConnection(sessionId);
