@@ -36,9 +36,10 @@ def run_startup_checks():
     while retry_count < max_retries:
         try:
             from models import engine, Base
-            # Test connection
+            # Test connection using SQLAlchemy 2.0+ syntax
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                result = conn.execute("SELECT 1")
+                result.fetchone()  # Consume the result
             print("✅ Database connection successful")
             break
         except Exception as e:

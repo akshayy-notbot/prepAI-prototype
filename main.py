@@ -93,6 +93,34 @@ def get_gemini_client():
 
 # --- API Endpoints ---
 
+@app.get("/")
+def root():
+    """Root endpoint - redirect to docs"""
+    return {"message": "PrepAI API is running", "docs": "/docs"}
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Render"""
+    try:
+        # Test database connection
+        from models import engine
+        with engine.connect() as conn:
+            result = conn.execute("SELECT 1")
+            result.fetchone()
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
 @app.post("/api/interviews")
 def create_interview(interview_data: InterviewCreate, db: Session = Depends(get_db)):
     """

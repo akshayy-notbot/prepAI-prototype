@@ -151,4 +151,10 @@ class Question(Base):
 
 # --- Function to create tables ---
 def create_tables():
-    Base.metadata.create_all(bind=engine)
+    """Create all database tables"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created/verified successfully")
+    except Exception as e:
+        print(f"❌ Error creating tables: {e}")
+        raise e
