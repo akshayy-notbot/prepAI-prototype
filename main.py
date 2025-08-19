@@ -9,7 +9,6 @@ load_dotenv()
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -25,8 +24,8 @@ from agents.persona import generate_ai_question
 # Import Celery tasks from celery_app
 from celery_app import my_test_task, orchestrate_next_turn
 
-# WebSocket connection manager
-active_connections: list[WebSocket] = []
+# HTTP polling connection manager (WebSocket alternative for Render)
+active_polling_sessions: list[str] = []
 
 # --- FastAPI App Initialization ---
 app = FastAPI()
@@ -904,22 +903,46 @@ def test_celery_task():
         "status": "Task queued successfully"
     }
 
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: int):
-    """WebSocket endpoint for real-time communication with clients"""
-    await websocket.accept()
-    active_connections.append(websocket)
-    print(f"Client #{client_id} connected.")
+@app.get("/api/interview-status/{session_id}")
+def get_interview_status(session_id: str, db: Session = Depends(get_db)):
+    """Get the current status of an interview session"""
     try:
-        while True:
-            # You can receive messages from the client if needed
-            data = await websocket.receive_text()
-            print(f"Message from client #{client_id}: {data}")
-            # And send messages back
-            await websocket.send_text(f"Message received: {data}")
-    except WebSocketDisconnect:
-        active_connections.remove(websocket)
-        print(f"Client #{client_id} disconnected.")
+        # Find the interview session
+        session = db.query(models.InterviewSession).filter(
+            models.InterviewSession.session_id == session_id
+        ).first()
+        
+        if not session:
+            raise HTTPException(status_code=404, detail="Interview session not found")
+        
+        # Check if there are any pending questions or if AI is processing
+        if session.status == 'in-progress':
+            # For now, return a simple status
+            # In a real implementation, you'd check the actual question queue
+            return {
+                "status": "processing",
+                "session_id": session_id,
+                "message": "AI is preparing your next question"
+            }
+        elif session.status == 'completed':
+            return {
+                "status": "complete",
+                "session_id": session_id,
+                "message": "Interview completed"
+            }
+        else:
+            return {
+                "status": "unknown",
+                "session_id": session_id,
+                "message": "Unknown status"
+            }
+            
+    except Exception as e:
+        print(f"Error getting interview status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get interview status: {str(e)}")
+
+# WebSocket endpoint removed - not supported on Render
+# Using HTTP polling instead for real-time updates
 
 @app.get("/test-redis")
 def test_redis():
