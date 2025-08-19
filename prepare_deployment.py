@@ -41,7 +41,14 @@ def create_deployment_package():
         '*.egg-info/',
         'node_modules/',
         'package-lock.json',
-        'yarn.lock'
+        'yarn.lock',
+        'deployment_package/',  # Don't copy the deployment package itself
+        'ReadME.rtf',           # Exclude RTF file
+        'test_frontend.html',   # Exclude test files
+        'debug_api.html',       # Exclude debug files
+        'env.local.example',    # Exclude local example
+        'migrate_database.py',  # Exclude migration scripts for now
+        'seed.py'               # Exclude seed scripts for now
     ]
     
     # Create deployment directory
@@ -98,6 +105,27 @@ def create_deployment_package():
     print("1. Upload all files from 'deployment_package' folder to GitHub")
     print("2. Make sure to include the .gitignore file")
     print("3. Follow the DEPLOYMENT_CHECKLIST.md for Render setup")
+    
+    # Verify critical files are present
+    critical_files = [
+        'main.py',
+        'celery_app.py',
+        'startup.py',
+        'models.py',
+        'requirements-render.txt',
+        'render.yaml',
+        '.gitignore',
+        'agents/',
+        'app.js',
+        'index.html'
+    ]
+    
+    print("\n🔍 Verifying critical files...")
+    for file in critical_files:
+        if (deployment_dir / file).exists():
+            print(f"   ✅ {file}")
+        else:
+            print(f"   ❌ {file} - MISSING!")
 
 def check_sensitive_files():
     """Check for potentially sensitive files that shouldn't be deployed."""

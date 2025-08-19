@@ -1,0 +1,28 @@
+# Simplified production requirements for Render deployment
+# This version excludes Redis/Celery dependencies for initial deployment
+
+# Core FastAPI dependencies
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+
+# Database dependencies
+sqlalchemy==2.0.43
+psycopg2-binary==2.9.10
+
+# AI dependencies
+google-generativeai==0.8.5
+
+# Core Python dependencies
+pydantic==2.11.7
+python-multipart==0.0.20
+python-dotenv==1.1.1
+
+# Additional dependencies
+httpx==0.28.1
+websockets==15.0.1
+requests==2.32.5
+
+# Minimal dependencies to avoid conflicts
+anyio==4.10.0
+starlette==0.47.2
+typing_extensions==4.14.1
