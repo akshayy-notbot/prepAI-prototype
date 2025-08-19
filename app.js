@@ -974,7 +974,8 @@ async function handleSubmitAnswer() {
 
     // 4. Send the answer to the backend via HTTP POST (clean approach)
     try {
-        const response = await fetch('/api/submit-answer', {
+        const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
+        const response = await fetch(`${API_BASE_URL}/api/submit-answer`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
