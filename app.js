@@ -1,17 +1,17 @@
 // --- Global State ---
 let interviewId = null;
-let sessionId = null;  // New: Store session ID from backend
+let sessionId = null;  // Store session ID from backend
 let questions = [];
 let currentQuestionIndex = 0;
 let transcript = [];
 let interviewConfig = {}; // To store user selections
+let websocket = null; // WebSocket connection for real-time communication
+let isWaitingForAI = false; // Track if we're waiting for AI response
 
 // --- Screen & Element References ---
 const screens = {
     homepage: document.getElementById('homepage-screen'),
-    onboardingRole: document.getElementById('onboarding-role-screen'),
-    onboardingExperience: document.getElementById('onboarding-experience-screen'),
-    onboardingSkills: document.getElementById('onboarding-skills-screen'),
+    onboarding: document.getElementById('onboarding-screen'), // New: Single onboarding screen
     dashboard: document.getElementById('dashboard-screen'),
     interviewPrep: document.getElementById('interview-prep-screen'),
     interview: document.getElementById('interview-screen'),
@@ -19,7 +19,6 @@ const screens = {
     feedback: document.getElementById('feedback-screen'),
 };
 
-const roleInput = document.getElementById('role-input');
 const chatInput = document.getElementById('chat-input');
 const chatWindow = document.getElementById('chat-window');
 const feedbackOutput = document.getElementById('feedback-output');
@@ -44,35 +43,445 @@ function addMessageToChat(message, sender) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-function displayCurrentQuestion() {
-    const question = questions[currentQuestionIndex];
-    if (question) {
-        // Handle both old database format and new Gemini API format
-        const questionText = question.question_text || question.question || question;
-        addMessageToChat(questionText, 'ai');
-        chatInput.disabled = false;
-        sendBtn.disabled = false;
-        chatInput.focus();
-    } else {
-        addMessageToChat("That was the last question. Click the 'End Interview' button to get your feedback.", 'ai');
-        chatInput.disabled = true;
-        sendBtn.disabled = true;
+// --- WebSocket Functions ---
+function establishWebSocketConnection(sessionId) {
+    console.log('🔌 Establishing WebSocket connection for session:', sessionId);
+    
+    // Close existing connection if any
+    if (websocket) {
+        websocket.close();
+    }
+    
+    // Determine the correct WebSocket protocol
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
+    
+    console.log('🔌 Connecting to WebSocket URL:', wsUrl);
+    
+    // Create real WebSocket connection
+    websocket = new WebSocket(wsUrl);
+    
+    console.log('✅ WebSocket connection created');
+    return websocket;
+}
+
+// WebSocket message checking (simplified for real WebSocket)
+async function checkForNewMessages(sessionId) {
+    // This function is kept for compatibility but not needed with real WebSockets
+    // The WebSocket onmessage handler will receive messages automatically
+    console.log('🔍 WebSocket message checking not needed with real WebSocket connection');
+}
+
+function updateCharacterCount() {
+    const charCountElement = document.getElementById('char-count');
+    if (charCountElement) {
+        const count = userInput.value.length;
+        charCountElement.textContent = count;
+        
+        // Add visual feedback for character limit
+        if (count > 1800) {
+            charCountElement.classList.add('text-red-500', 'font-semibold');
+        } else if (count > 1500) {
+            charCountElement.classList.add('text-yellow-500', 'font-semibold');
+            charCountElement.classList.remove('text-red-500');
+        } else {
+            charCountElement.classList.remove('text-red-500', 'text-yellow-500', 'font-semibold');
+        }
     }
 }
 
-// --- Onboarding Flow ---
-document.getElementById('start-onboarding-btn').addEventListener('click', () => showScreen('onboardingRole'));
+// Update progress bar and counters
+function updateProgressBar(questionsAnswered, totalQuestions) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const questionsAnsweredElement = document.getElementById('questions-answered');
+    const totalQuestionsElement = document.getElementById('total-questions');
+    
+    if (progressBar && progressText && questionsAnsweredElement && totalQuestionsElement) {
+        const percentage = totalQuestions > 0 ? (questionsAnswered / totalQuestions) * 100 : 0;
+        
+        progressBar.style.width = `${percentage}%`;
+        progressText.textContent = `${Math.round(percentage)}% Complete`;
+        questionsAnsweredElement.textContent = questionsAnswered;
+        totalQuestionsElement.textContent = totalQuestions;
+        
+        // Add animation class when progress changes
+        progressBar.classList.add('progress-bar-animated');
+        setTimeout(() => {
+            progressBar.classList.remove('progress-bar-animated');
+        }, 2000);
+    }
+}
 
-document.getElementById('role-next-btn').addEventListener('click', () => {
-    if (!roleInput.value.trim()) { alert('Please select a role.'); return; }
-    interviewConfig.role = roleInput.value.trim();
-    showScreen('onboardingExperience');
-});
+// Cleanup function for WebSocket connections
+function cleanupWebSocket() {
+    if (websocket) {
+        websocket.close();
+        websocket = null;
+    }
+}
 
+function handleWebSocketMessage(message) {
+    console.log('📨 Received WebSocket message:', message);
+    
+    try {
+        // Try to parse as JSON first (for structured messages)
+        const data = typeof message === 'string' ? JSON.parse(message) : message;
+        
+        if (data.type === 'question') {
+            // Structured question message
+            handleAIQuestion(data.content || data.message || 'New question received');
+        } else if (data.type === 'error') {
+            // Error message
+            console.error('❌ AI Error:', data.message);
+            displayErrorMessage(data.message || 'An error occurred');
+        } else if (data.type === 'status') {
+            // Status update
+            updateQuestionStatus(data.message || 'Status update');
+        } else if (data.type === 'interview_complete') {
+            // Interview completion
+            handleInterviewCompletion(data.message || 'Interview completed successfully!');
+        } else {
+            // Default: treat as a question
+            handleAIQuestion(data.content || data.message || message);
+        }
+        
+    } catch (error) {
+        console.log('📨 Treating message as plain text question');
+        // Treat as plain text question (like your LLM code)
+        handleAIQuestion(message);
+    }
+}
+
+// Simplified AI question handler (like your LLM code)
+function handleAIQuestion(questionText) {
+    console.log('🤖 AI Question received:', questionText);
+    
+    // Hide loading states
+    hideQuestionLoading();
+    hideInputLoadingStates();
+    
+    // Display the AI's question
+    displayAIMessage(questionText);
+    
+    // Re-enable input (like your LLM code)
+    enableChatInput();
+    
+    // Update status
+    updateQuestionStatus('Question received');
+    
+    // Update progress
+    updateProgressBar(transcript.length, transcript.length + 1);
+}
+
+function handleInterviewCompletion(message) {
+    console.log('🎉 Interview completed:', message);
+    
+    // Display completion message
+    displayAIMessage(message);
+    
+    // Disable input
+    disableChatInput();
+    
+    // Update status
+    updateQuestionStatus('Interview complete');
+    
+    // Update progress to 100%
+    updateProgressBar(transcript.length, transcript.length);
+    
+    // Show completion message
+    setTimeout(() => {
+        const completionMessage = document.createElement('div');
+        completionMessage.className = 'text-center py-4 text-green-600 font-semibold';
+        completionMessage.innerHTML = `
+            <div class="flex items-center justify-center space-x-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span>All interview goals have been covered!</span>
+            </div>
+        `;
+        chatWindow.appendChild(completionMessage);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }, 1000);
+}
+
+function displayAIMessage(message) {
+    // Use the message template from HTML for consistent styling
+    const template = document.getElementById('message-template');
+    if (template) {
+        const messageElement = template.content.cloneNode(true);
+        
+        // Update the message content
+        const contentDiv = messageElement.querySelector('.message-content');
+        if (contentDiv) {
+            contentDiv.textContent = message;
+        }
+        
+        // Add AI styling
+        const messageBubble = messageElement.querySelector('.message-bubble');
+        if (messageBubble) {
+            messageBubble.classList.add('ai');
+        }
+        
+        // Add timestamp
+        const metaDiv = messageElement.querySelector('.message-meta');
+        if (metaDiv) {
+            metaDiv.textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Add to chat window
+        chatWindow.appendChild(messageElement);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+        // Update transcript
+        transcript.push({
+            question: message,
+            answer: null,
+            timestamp: new Date().toISOString()
+        });
+        
+    } else {
+        // Fallback to simple method (like your LLM code)
+        addMessageToChat(message, 'ai');
+    }
+}
+
+// Enhanced addMessageToChat function (like your LLM code but with better styling)
+function addMessageToChat(message, sender) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'chat-message flex gap-3 mb-4';
+    
+    // Avatar and message alignment (like your LLM code)
+    if (sender === 'user') {
+        messageDiv.classList.add('justify-end'); // Align user messages to the right
+    } else {
+        messageDiv.classList.add('justify-start'); // Align AI messages to the left
+    }
+    
+    // Avatar
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'flex-shrink-0';
+    avatarDiv.innerHTML = `
+        <div class="w-8 h-8 rounded-full ${sender === 'user' ? 'bg-blue-100' : 'bg-purple-100'} flex items-center justify-center">
+            <svg class="w-4 h-4 ${sender === 'user' ? 'text-blue-600' : 'text-purple-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+            </svg>
+        </div>
+    `;
+    
+    // Message bubble
+    const messageBubble = document.createElement('div');
+    messageBubble.className = 'flex-grow';
+    messageBubble.innerHTML = `
+        <div class="message-bubble p-4 ${sender === 'user' ? 'user' : 'ai'}">
+            <div class="message-content">${message}</div>
+            <div class="message-meta text-xs opacity-75 mt-2">${new Date().toLocaleTimeString()}</div>
+        </div>
+    `;
+    
+    messageDiv.appendChild(avatarDiv);
+    messageDiv.appendChild(messageBubble);
+    
+    chatWindow.appendChild(messageDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+}
+
+function displayErrorMessage(message) {
+    // Use the error template from HTML
+    const template = document.getElementById('error-template');
+    if (template) {
+        const messageElement = template.content.cloneNode(true);
+        
+        // Update the message content
+        const contentDiv = messageElement.querySelector('.message-content');
+        if (contentDiv) {
+            contentDiv.textContent = message;
+        }
+        
+        // Add retry functionality
+        const retryBtn = messageElement.querySelector('.retry-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => {
+                // Remove the error message
+                messageElement.remove();
+                // Retry the last action
+                retryLastAction();
+            });
+        }
+        
+        // Add to chat window
+        chatWindow.appendChild(messageElement);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+    } else {
+        // Fallback to old method
+        addMessageToChat(`Error: ${message}`, 'ai');
+    }
+}
+
+function retryLastAction() {
+    // Implement retry logic based on your needs
+    console.log('🔄 Retrying last action...');
+    // For now, just re-enable input
+    enableChatInput();
+}
+
+function enableChatInput() {
+    userInput.disabled = false;
+    submitButton.disabled = false;
+    userInput.focus();
+    isWaitingForAI = false;
+    
+    // Update status
+    updateQuestionStatus('Ready for your answer');
+}
+
+function disableChatInput() {
+    userInput.disabled = true;
+    submitButton.disabled = true;
+    isWaitingForAI = true;
+}
+
+function updateQuestionStatus(status) {
+    const statusElement = document.getElementById('question-status');
+    if (statusElement) {
+        statusElement.textContent = status;
+    }
+}
+
+function hideInputLoadingStates() {
+    // Hide all loading indicators
+    const typingIndicator = document.getElementById('typing-indicator');
+    const processingIndicator = document.getElementById('processing-indicator');
+    const successIndicator = document.getElementById('success-indicator');
+    
+    if (typingIndicator) typingIndicator.classList.add('hidden');
+    if (processingIndicator) processingIndicator.classList.add('hidden');
+    if (successIndicator) successIndicator.classList.add('hidden');
+}
+
+function showInputLoadingState(type) {
+    // Hide all first
+    hideInputLoadingStates();
+    
+    // Show the requested one
+    switch (type) {
+        case 'typing':
+            const typingIndicator = document.getElementById('typing-indicator');
+            if (typingIndicator) typingIndicator.classList.remove('hidden');
+            break;
+        case 'processing':
+            const processingIndicator = document.getElementById('processing-indicator');
+            if (processingIndicator) processingIndicator.classList.remove('hidden');
+            break;
+        case 'success':
+            const successIndicator = document.getElementById('success-indicator');
+            if (successIndicator) successIndicator.classList.remove('hidden');
+            break;
+    }
+}
+
+// --- Enhanced Onboarding Flow ---
+document.getElementById('start-onboarding-btn').addEventListener('click', () => showScreen('onboarding'));
+
+// Role selection handler
+function handleRoleSelect(role) {
+    interviewConfig.role = role;
+    updateOnboardingUI();
+}
+
+// Experience selection handler
 function handleExperienceSelect(level) {
     interviewConfig.seniority = level;
-    showScreen('onboardingSkills');
-    populateSkillsOptions();
+    updateOnboardingUI();
+}
+
+// Update the onboarding UI based on current selections
+function updateOnboardingUI() {
+    const roleSection = document.getElementById('role-section');
+    const experienceSection = document.getElementById('experience-section');
+    const skillsSection = document.getElementById('skills-section');
+    const continueBtn = document.getElementById('onboarding-continue-btn');
+    
+    // Update role section styling and button states
+    if (interviewConfig.role) {
+        roleSection.classList.add('selected');
+        roleSection.classList.remove('unselected');
+        
+        // Update role button states
+        document.querySelectorAll('.role-btn').forEach(btn => {
+            btn.classList.remove('selected');
+            // Use data-value attribute for reliable matching
+            const buttonValue = btn.getAttribute('data-value');
+            if (buttonValue === interviewConfig.role) {
+                btn.classList.add('selected');
+            }
+        });
+    } else {
+        roleSection.classList.remove('selected');
+        roleSection.classList.add('unselected');
+        document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('selected'));
+    }
+    
+    // Update experience section styling and enable/disable
+    if (interviewConfig.role) {
+        experienceSection.classList.remove('disabled');
+        if (interviewConfig.seniority) {
+            experienceSection.classList.add('selected');
+            experienceSection.classList.remove('unselected');
+            
+            // Update experience button states
+            document.querySelectorAll('.experience-btn').forEach(btn => {
+                btn.classList.remove('selected');
+                // Use data-value attribute for reliable matching
+                const buttonValue = btn.getAttribute('data-value');
+                if (buttonValue === interviewConfig.seniority) {
+                    btn.classList.add('selected');
+                }
+            });
+        } else {
+            experienceSection.classList.remove('selected');
+            experienceSection.classList.add('unselected');
+            document.querySelectorAll('.experience-btn').forEach(btn => btn.classList.remove('selected'));
+        }
+    } else {
+        experienceSection.classList.add('disabled');
+        experienceSection.classList.remove('selected', 'unselected');
+        document.querySelectorAll('.experience-btn').forEach(btn => btn.classList.remove('selected'));
+    }
+    
+    // Update skills section and show relevant skills
+    if (interviewConfig.role && interviewConfig.seniority) {
+        skillsSection.classList.remove('hidden');
+        // Initialize skills array if not already set
+        if (!interviewConfig.skills) {
+            interviewConfig.skills = [];
+        }
+        populateSkillsOptions();
+        
+        // Sync checkbox states after populating
+        setTimeout(() => syncSkillCheckboxStates(), 0);
+        
+        if (interviewConfig.skills && interviewConfig.skills.length > 0) {
+            skillsSection.classList.add('selected');
+            skillsSection.classList.remove('unselected');
+        } else {
+            skillsSection.classList.remove('selected');
+            skillsSection.classList.add('unselected');
+        }
+    } else {
+        skillsSection.classList.add('hidden');
+    }
+    
+    // Enable/disable continue button
+    if (interviewConfig.role && interviewConfig.seniority && interviewConfig.skills && interviewConfig.skills.length > 0) {
+        continueBtn.disabled = false;
+        continueBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        continueBtn.disabled = true;
+        continueBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
 }
 
 function populateSkillsOptions() {
@@ -115,76 +524,241 @@ function populateSkillsOptions() {
     
     const skills = roleSkills[role] || [];
     
-    skillsContainer.innerHTML = skills.map(skill => `
-        <label class="flex items-center space-x-3 cursor-pointer">
-            <input type="checkbox" value="${skill}" class="form-checkbox h-5 w-5 text-blue-600 rounded">
-            <span class="text-gray-700">${skill}</span>
-        </label>
-    `).join('');
+    skillsContainer.innerHTML = skills.map(skill => {
+        const isChecked = interviewConfig.skills && interviewConfig.skills.includes(skill);
+        const checkedAttr = isChecked ? 'checked' : '';
+        const labelClass = isChecked ? 'bg-blue-50 border border-blue-200' : '';
+        
+        return `
+            <label class="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-blue-50 transition-colors ${labelClass}">
+                <input type="checkbox" value="${skill}" class="skill-checkbox form-checkbox h-5 w-5 text-blue-600 rounded" ${checkedAttr}>
+                <span class="text-gray-700">${skill}</span>
+            </label>
+        `;
+    }).join('');
+    
+    // Add event listeners to all skill checkboxes
+    const skillCheckboxes = skillsContainer.querySelectorAll('.skill-checkbox');
+    skillCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            handleSkillToggle();
+        });
+    });
 }
 
-document.getElementById('skills-next-btn').addEventListener('click', () => {
+// Handle skill selection/deselection
+function handleSkillToggle() {
     const selectedSkills = Array.from(document.querySelectorAll('#skills-options input:checked'))
         .map(input => input.value);
-    
-    if (selectedSkills.length === 0) {
-        alert('Please select at least one skill to practice.');
-        return;
-    }
-    
     interviewConfig.skills = selectedSkills;
-    showScreen('dashboard');
     
-    // Update dashboard display
-    document.getElementById('dashboard-role-company').textContent = `For a ${interviewConfig.role} role (${interviewConfig.seniority} level).`;
-    document.getElementById('key-skills-list').innerHTML = interviewConfig.skills.map(skill => `<li>${skill}</li>`).join('');
+    // Add visual feedback for selected skills
+    document.querySelectorAll('.skill-checkbox').forEach(checkbox => {
+        const label = checkbox.closest('label');
+        if (checkbox.checked) {
+            label.classList.add('bg-blue-50', 'border', 'border-blue-200');
+        } else {
+            label.classList.remove('bg-blue-50', 'border', 'border-blue-200');
+        }
+    });
+    
+    updateOnboardingUI();
+}
+
+// Helper function to sync visual state of skill checkboxes
+function syncSkillCheckboxStates() {
+    if (!interviewConfig.skills) return;
+    
+    document.querySelectorAll('.skill-checkbox').forEach(checkbox => {
+        const label = checkbox.closest('label');
+        const isSelected = interviewConfig.skills.includes(checkbox.value);
+        
+        // Update checkbox checked state
+        checkbox.checked = isSelected;
+        
+        // Update label visual state
+        if (isSelected) {
+            label.classList.add('bg-blue-50', 'border', 'border-blue-200');
+        } else {
+            label.classList.remove('bg-blue-50', 'border', 'border-blue-200');
+        }
+    });
+}
+
+// Continue to dashboard
+document.getElementById('onboarding-continue-btn').addEventListener('click', () => {
+    if (interviewConfig.role && interviewConfig.seniority && interviewConfig.skills && interviewConfig.skills.length > 0) {
+        showScreen('dashboard');
+        
+        // Update dashboard display
+        document.getElementById('dashboard-role-company').textContent = `For a ${interviewConfig.role} role (${interviewConfig.seniority} level).`;
+        document.getElementById('key-skills-list').innerHTML = interviewConfig.skills.map(skill => `<li>${skill}</li>`).join('');
+    }
 });
 
+// Make functions globally accessible for onclick attributes
+window.handleRoleSelect = handleRoleSelect;
+window.handleExperienceSelect = handleExperienceSelect;
+
+// --- Dashboard and Interview Navigation ---
 document.getElementById('go-to-interview-prep-btn').addEventListener('click', () => showScreen('interviewPrep'));
 document.getElementById('start-interview-btn').addEventListener('click', startInterview);
 
-// Make the function globally accessible for the onclick attributes in the HTML
-window.handleExperienceSelect = handleExperienceSelect;
-
 // --- Core API Interaction Logic ---
+// NEW ASYNCHRONOUS FLOW WITH ORCHESTRATOR:
+// 1. startInterview() -> calls /api/start-interview -> establishes WebSocket
+// 2. handleSubmitAnswer() -> calls /api/submit-answer (returns 202 immediately)
+// 3. WebSocket receives AI question -> handleWebSocketMessage() -> displays question
+// 4. Repeat steps 2-3 until interview complete
+// 5. endInterview() -> calls /api/interviews/{id}/complete -> shows analysis
+
 async function startInterview() {
     showScreen('interview');
-    addMessageToChat("Hello! I'm your AI interviewer. I'm just getting the first question ready...", 'ai');
+    
+    // Start the timer
+    startTimer();
+    
+    // Show loading state
+    showQuestionLoading("Starting your AI interview...");
+    
+    // Clear chat window and show welcome message
+    const chatWindow = document.getElementById('chat-window');
+    chatWindow.innerHTML = `
+        <div class="text-center py-8 text-gray-500">
+            <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+            </div>
+            <p class="text-lg font-medium">Your interview is starting...</p>
+            <p class="text-sm">The AI interviewer is preparing your first question</p>
+        </div>
+    `;
 
     try {
-        // Generate questions using Gemini API directly
-        const generatedQuestions = await generateQuestionsWithGemini();
+        // Start the interview using the new orchestrator system
+        const interviewResponse = await startOrchestratorInterview();
         
-        if (generatedQuestions && generatedQuestions.length > 0) {
-            questions = generatedQuestions;
+        if (interviewResponse && interviewResponse.session_id) {
+            sessionId = interviewResponse.session_id;
             interviewId = Date.now(); // Generate a simple ID for tracking
             
-            console.log(`Interview started with ID: ${interviewId}`);
-            displayCurrentQuestion();
+            console.log('🎯 Interview started with session ID:', sessionId);
+            
+            // A. Establish WebSocket Connection
+            const wsConnection = establishWebSocketConnection(sessionId);
+            
+            // B. Set up message handling (real WebSocket)
+            wsConnection.onmessage = (event) => {
+                console.log('📨 Raw WebSocket message received:', event.data);
+                handleWebSocketMessage(event.data);
+            };
+            
+            wsConnection.onopen = (event) => {
+                console.log('🔌 WebSocket connection opened successfully');
+                updateQuestionStatus('Connected to AI interviewer');
+            };
+            
+            wsConnection.onclose = (event) => {
+                console.log('🔌 WebSocket connection closed:', event);
+                updateQuestionStatus('Connection lost - reconnecting...');
+                
+                // Simple reconnection logic (like your LLM code)
+                if (event.code !== 1000) { // Not a normal closure
+                    setTimeout(() => {
+                        console.log('🔄 Attempting to reconnect...');
+                        establishWebSocketConnection(sessionId);
+                    }, 3000); // Wait 3 seconds before reconnecting
+                }
+            };
+            
+            wsConnection.onerror = (error) => {
+                console.error('❌ WebSocket error:', error);
+                updateQuestionStatus('Connection error - please refresh');
+            };
+            
+            // Show typing indicator while waiting for first question
+            showInputLoadingState('typing');
+            updateQuestionStatus('AI is preparing your first question...');
+            
         } else {
-            throw new Error('Failed to generate questions');
+            throw new Error('Failed to start interview - no session ID received');
         }
 
     } catch (error) {
-        console.error(error);
-        addMessageToChat('Error: Could not start the interview. Please check your API key and try again.', 'ai');
+        console.error('❌ Error starting interview:', error);
+        displayErrorMessage('Could not start the interview. Please try again.');
+        hideQuestionLoading();
     }
 }
 
-// New function to generate questions using Gemini API
+// Timer functionality
+let timerInterval;
+let startTime;
+
+function startTimer() {
+    startTime = Date.now();
+    timerInterval = setInterval(updateTimer, 1000);
+}
+
+function updateTimer() {
+    const elapsed = Date.now() - startTime;
+    const minutes = Math.floor(elapsed / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    const timerElement = document.getElementById('timer');
+    if (timerElement) {
+        timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+function stopTimer() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+    }
+}
+
+// Loading state management
+function showQuestionLoading(message) {
+    const statusElement = document.getElementById('question-status');
+    const loaderElement = document.getElementById('question-loader');
+    
+    if (statusElement) statusElement.textContent = message;
+    if (loaderElement) loaderElement.classList.remove('hidden');
+}
+
+function hideQuestionLoading() {
+    const statusElement = document.getElementById('question-status');
+    const loaderElement = document.getElementById('question-loader');
+    
+    if (statusElement) statusElement.textContent = 'Ready';
+    if (loaderElement) loaderElement.classList.add('hidden');
+}
+
+// --- Legacy Functions (Kept for backward compatibility) ---
+// Note: These functions are from the old synchronous flow and are no longer used
+// in the new orchestrator-based asynchronous flow. They're kept here in case
+// of fallback scenarios but should be removed in future versions.
+
+function displayCurrentQuestion() {
+    // LEGACY: This function is no longer used with the new orchestrator flow
+    // Questions now come via WebSocket from the orchestrator
+    console.log('⚠️ LEGACY: displayCurrentQuestion called - this should not happen with orchestrator flow');
+}
+
 async function generateQuestionsWithGemini() {
+    // LEGACY: This function is no longer used with the new orchestrator flow
+    // The orchestrator now handles question generation dynamically
+    console.log('⚠️ LEGACY: generateQuestionsWithGemini called - this should not happen with orchestrator flow');
+    throw new Error('Legacy function called - please use orchestrator flow');
+}
+
+async function startOrchestratorInterview() {
     const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
     
-    console.log('🔍 Starting question generation...');
-    console.log('📡 API URL:', API_BASE_URL);
-    console.log('📋 Request payload:', {
-        role: interviewConfig.role,
-        seniority: interviewConfig.seniority,
-        skills: interviewConfig.skills
-    });
-    
     try {
-        const response = await fetch(`${API_BASE_URL}/api/generate-questions`, {
+        console.log('🚀 Starting orchestrator interview with config:', interviewConfig);
+        
+        const response = await fetch(`${API_BASE_URL}/api/start-interview`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -194,9 +768,6 @@ async function generateQuestionsWithGemini() {
             })
         });
 
-        console.log('📥 Response status:', response.status);
-        console.log('📥 Response headers:', response.headers);
-
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ Response error text:', errorText);
@@ -204,60 +775,60 @@ async function generateQuestionsWithGemini() {
         }
 
         const data = await response.json();
-        console.log('✅ Response data:', data);
+        console.log('✅ Interview started successfully:', data);
         
-        // Store session ID for database tracking
-        if (data.session_id) {
-            sessionId = data.session_id;
-            console.log('🆔 Session ID stored:', sessionId);
-        }
-        
-        if (data.questions && Array.isArray(data.questions)) {
-            console.log('✅ Questions received:', data.questions.length);
-            return data.questions;
-        } else {
-            console.error('❌ Invalid response format:', data);
-            throw new Error('Invalid response format from server');
-        }
+        return data;
 
     } catch (error) {
-        console.error('❌ Error generating questions:', error);
-        console.error('❌ Error details:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
+        console.error('❌ Error starting orchestrator interview:', error);
         throw error;
     }
 }
 
-function handleUserResponse() {
-    const answer = chatInput.value.trim();
-    if (!answer) return;
 
-    addMessageToChat(answer, 'user');
-    
-    const currentQuestion = questions[currentQuestionIndex];
-    // Handle both old database format and new Gemini API format
-    const questionText = currentQuestion.question_text || currentQuestion.question || currentQuestion;
-    
-    transcript.push({
-        question: questionText,
-        answer: answer
-    });
 
-    chatInput.value = '';
-    chatInput.disabled = true;
-    sendBtn.disabled = true;
-
-    currentQuestionIndex++;
-    
-    setTimeout(displayCurrentQuestion, 1000);
+function displayUserMessage(message) {
+    // Use the message template from HTML
+    const template = document.getElementById('message-template');
+    if (template) {
+        const messageElement = template.content.cloneNode(true);
+        
+        // Update the message content
+        const contentDiv = messageElement.querySelector('.message-content');
+        if (contentDiv) {
+            contentDiv.textContent = message;
+        }
+        
+        // Add user styling
+        const messageBubble = messageElement.querySelector('.message-bubble');
+        if (messageBubble) {
+            messageBubble.classList.add('user');
+        }
+        
+        // Add timestamp
+        const metaDiv = messageElement.querySelector('.message-meta');
+        if (metaDiv) {
+            metaDiv.textContent = new Date().toLocaleTimeString();
+        }
+        
+        // Add to chat window
+        chatWindow.appendChild(messageElement);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        
+    } else {
+        // Fallback to old method
+        addMessageToChat(message, 'user');
+    }
 }
 
+// REMOVED: submitAnswerToOrchestrator function has been replaced by handleSubmitAnswer
+// which uses the cleaner, more standard approach from the LLM code
+
 async function endInterview() {
+    // Stop the timer
+    stopTimer();
+    
     showScreen('analysis');
-    console.log("Interview ended. Sending transcript and waiting for analysis...");
 
     // Use the live Render backend URL
     const API_BASE_URL = "https://prepai-api.onrender.com"; 
@@ -268,7 +839,10 @@ async function endInterview() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 transcript: transcript,
-                session_id: sessionId  // Pass session ID for database tracking
+                session_id: sessionId,  // Pass session ID for database tracking
+                role: interviewConfig.role,  // Pass role for context
+                seniority: interviewConfig.seniority,  // Pass seniority for context
+                skills: interviewConfig.skills  // Pass skills for context
             })
         });
 
@@ -277,7 +851,6 @@ async function endInterview() {
         }
 
         const result = await response.json();
-        console.log('📊 Analysis result:', result);
 
         showScreen('feedback');
         
@@ -365,14 +938,115 @@ async function endInterview() {
 }
 
 // --- Event Listeners ---
-sendBtn.addEventListener('click', handleUserResponse);
-chatInput.addEventListener('keydown', (e) => { 
-    if (e.key === 'Enter' && !e.shiftKey && !e.target.disabled) {
+// Clean event listener setup (like LLM code)
+const submitButton = sendBtn; // Use existing reference
+const userInput = chatInput; // Use existing reference
+
+submitButton.addEventListener('click', handleSubmitAnswer);
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        handleUserResponse();
+        handleSubmitAnswer();
     }
 });
 document.getElementById('end-interview-btn').addEventListener('click', endInterview);
+
+// Clean, focused answer submission handler (best of both worlds)
+async function handleSubmitAnswer() {
+    const answerText = userInput.value.trim();
+    if (!answerText) return; // Don't send empty answers
+
+    console.log('🚀 Submitting answer via orchestrator');
+
+    // 1. Immediately display the user's answer in the chat (like LLM code)
+    addMessageToChat(answerText, 'user');
+    userInput.value = ''; // Clear the input field
+    
+    // 2. Update transcript
+    transcript.push({
+        question: transcript.length > 0 ? transcript[transcript.length - 1].question : 'First question',
+        answer: answerText,
+        timestamp: new Date().toISOString()
+    });
+
+    // 3. Show loading indicator and disable input (like LLM code + visual feedback)
+    showInputLoadingState('processing');
+    updateQuestionStatus('Processing your answer...');
+    userInput.disabled = true;
+    submitButton.disabled = true;
+
+    // 4. Send the answer to the backend via HTTP POST (clean approach)
+    try {
+        const response = await fetch('/api/submit-answer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                answer: answerText,
+            }),
+        });
+
+        if (response.status !== 202) {
+            // Handle error if the server didn't accept the request
+            console.error("Failed to submit answer.");
+            addMessageToChat("Error: Could not submit answer.", 'system');
+            // Re-enable input on error
+            userInput.disabled = false;
+            submitButton.disabled = false;
+            hideInputLoadingStates();
+        } else {
+            // Success feedback (brief visual confirmation)
+            showInputLoadingState('success');
+            updateQuestionStatus('Answer submitted - waiting for AI response...');
+            
+            // Transition to waiting state after brief success indication
+            setTimeout(() => {
+                showInputLoadingState('typing');
+                updateQuestionStatus('AI is thinking...');
+            }, 1500);
+        }
+        
+        // NOTE: We don't need to do anything else with the successful response.
+        // The WebSocket 'onmessage' handler is now responsible for handling the next question.
+
+    } catch (error) {
+        console.error("Error submitting answer:", error);
+        addMessageToChat("Error: Network issue. Please try again.", 'system');
+        // Re-enable input on error
+        userInput.disabled = false;
+        submitButton.disabled = false;
+        hideInputLoadingStates();
+        updateQuestionStatus('Ready for your answer');
+    }
+}
+
+// Character counter functionality
+userInput.addEventListener('input', updateCharacterCount);
+
+// Clear input button
+document.getElementById('clear-input-btn')?.addEventListener('click', () => {
+    userInput.value = '';
+    updateCharacterCount();
+    userInput.focus();
+});
+
+// Save draft button (placeholder for future implementation)
+document.getElementById('save-draft-btn')?.addEventListener('click', () => {
+    console.log('💾 Save draft functionality - to be implemented');
+    // Future: Save current input to localStorage or backend
+});
+
+// Handle page refresh/restart
+function restart() {
+    stopTimer();
+    cleanupWebSocket();
+    location.reload();
+}
+
+// Make restart function globally accessible
+window.restart = restart;
 
 // --- Initial Load ---
 showScreen('homepage');

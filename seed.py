@@ -12,7 +12,7 @@ questions_to_add = [
         role="Product Manager",
         seniority="Senior",
         skill_tags=["Product Design", "User Empathy"]
-    ),
+    ),  
     Question(
         question_text="Tell me about a time you used data to influence a product decision.",
         role="Product Manager",

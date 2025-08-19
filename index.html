@@ -34,6 +34,131 @@
         .choice-button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
+        
+        /* Onboarding section states */
+        .selected { border-color: #3b82f6; background-color: #eff6ff; }
+        .unselected { border-color: #d1d5db; background-color: white; }
+        .disabled { opacity: 0.5; pointer-events: none; }
+        
+        /* Role and experience button states */
+        .role-btn.selected, .experience-btn.selected {
+            background-color: #3b82f6;
+            color: white;
+            transform: scale(1.02);
+        }
+        
+        .role-btn.selected h4, .experience-btn.selected h4,
+        .role-btn.selected p, .experience-btn.selected p {
+            color: white;
+        }
+        
+        /* Better hover states for selected buttons */
+        .role-btn.selected:hover, .experience-btn.selected:hover {
+            background-color: #2563eb !important; /* Darker blue on hover for selected */
+            transform: scale(1.03);
+        }
+        
+        /* Hover states for unselected buttons */
+        .role-btn:not(.selected):hover, .experience-btn:not(.selected):hover {
+            background-color: #f0f9ff;
+            border-color: #93c5fd;
+        }
+        
+        /* Enhanced Chat Interface Styles */
+        .chat-message {
+            animation: slideInUp 0.3s ease-out;
+        }
+        
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message-bubble {
+            max-width: 80%;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+        
+        .message-bubble.user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 18px 18px 4px 18px;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+        
+        .message-bubble.ai {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 18px 18px 18px 4px;
+            box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
+        }
+        
+        .message-bubble.system {
+            background: #f8fafc;
+            color: #64748b;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            font-style: italic;
+        }
+        
+        /* Enhanced Input Styles */
+        .chat-input-container {
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        
+        .chat-input-container:focus-within {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chat-input-container:focus-within #input-focus-indicator {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        /* Progress Bar Animation */
+        .progress-bar-animated {
+            background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #3b82f6 100%);
+            background-size: 200% 100%;
+            animation: progressShimmer 2s ease-in-out infinite;
+        }
+        
+        @keyframes progressShimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        /* Loading States */
+        .loading-pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .message-bubble {
+                max-width: 90%;
+            }
+            
+            .chat-input-container {
+                margin: 0 -1rem;
+            }
+            
+            #chat-window {
+                height: 60vh;
+            }
+        }
     </style>
 </head>
 <body class="text-gray-800">
@@ -42,71 +167,173 @@
 
         <!-- Act I, Scene 1: Homepage -->
         <div id="homepage-screen" class="screen-container">
-            <div class="card text-center">
-                <h1 class="text-4xl md:text-5xl font-bold text-gray-900">Go from Interview Anxiety to a Confident "Yes."</h1>
-                <p class="text-lg text-gray-600 mt-4">Practice with our AI-powered interviewer, get instant, actionable feedback, and ace the hiring process for your dream job.</p>
-                <button id="start-onboarding-btn" class="mt-8 w-full md:w-auto bg-blue-600 text-white font-bold py-4 px-8 rounded-lg hover:bg-blue-700 transition duration-300 text-lg">Start Your First Free Mock Interview</button>
-                <div class="mt-8">
-                    <p class="text-sm text-gray-500 uppercase tracking-wider">TRUSTED BY CANDIDATES HIRED AT</p>
-                    <div class="flex justify-center items-center gap-8 mt-4 text-gray-400">
-                        <span class="font-bold">Google</span>
-                        <span class="font-bold">Amazon</span>
-                        <span class="font-bold">Meta</span>
-                        <span class="font-bold">Netflix</span>
+            <div class="max-w-5xl mx-auto">
+                <!-- Hero Section -->
+                <div class="card text-center mb-8">
+                    <div class="mb-6">
+                        <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                            <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                            </svg>
+                        </div>
+                        <h1 class="text-4xl md:text-6xl font-bold text-gray-900 leading-tight">
+                            Go from Interview Anxiety to a 
+                            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Confident "Yes"</span>
+                        </h1>
+                        <p class="text-xl text-gray-600 mt-6 max-w-3xl mx-auto leading-relaxed">
+                            Practice with our AI-powered interviewer, get instant, actionable feedback, and ace the hiring process for your dream job.
+                        </p>
+                    </div>
+                    
+                    <!-- Key Benefits -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="text-center p-4">
+                            <div class="w-12 h-12 mx-auto mb-3 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-gray-800 mb-2">Instant Feedback</h3>
+                            <p class="text-sm text-gray-600">Get detailed analysis and improvement suggestions immediately</p>
+                        </div>
+                        <div class="text-center p-4">
+                            <div class="w-12 h-12 mx-auto mb-3 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-gray-800 mb-2">AI-Powered</h3>
+                            <p class="text-sm text-gray-600">Advanced AI that adapts to your role and experience level</p>
+                        </div>
+                        <div class="text-center p-4">
+                            <div class="w-12 h-12 mx-auto mb-3 bg-green-100 rounded-lg flex items-center justify-center">
+                                <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-gray-800 mb-2">Practice Anytime</h3>
+                            <p class="text-sm text-gray-600">24/7 availability for unlimited interview practice</p>
+                        </div>
+                    </div>
+
+                    <!-- CTA Button -->
+                    <button id="start-onboarding-btn" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold py-5 px-10 rounded-xl hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 text-xl shadow-lg hover:shadow-xl">
+                        Start Your First Free Mock Interview
+                    </button>
+                    
+                    <!-- Trust Indicators -->
+                    <div class="mt-8">
+                        <p class="text-sm text-gray-500 uppercase tracking-wider mb-3">TRUSTED BY CANDIDATES HIRED AT</p>
+                        <div class="flex justify-center items-center gap-8 mb-4">
+                            <div class="text-center">
+                                <div class="w-12 h-12 mx-auto mb-2 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <span class="font-bold text-gray-700 text-lg">G</span>
+                                </div>
+                                <span class="text-sm font-semibold text-gray-600">Google</span>
+                            </div>
+                            <div class="text-center">
+                                <div class="w-12 h-12 mx-auto mb-2 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <span class="font-bold text-gray-700 text-lg">A</span>
+                                </div>
+                                <span class="text-sm font-semibold text-gray-600">Amazon</span>
+                            </div>
+                            <div class="text-center">
+                                <div class="w-12 h-12 mx-auto mb-2 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <span class="font-bold text-gray-700 text-lg">M</span>
+                                </div>
+                                <span class="text-sm font-semibold text-gray-600">Meta</span>
+                            </div>
+                            <div class="text-center">
+                                <div class="w-12 h-12 mx-auto mb-2 bg-gray-100 rounded-lg flex items-center justify-center">
+                                    <span class="font-bold text-gray-700 text-lg">N</span>
+                                </div>
+                                <span class="text-sm font-semibold text-gray-600">Netflix</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Success Metrics -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8 pt-8 border-t border-gray-200">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-blue-600 mb-1">95%</div>
+                                <div class="text-sm text-gray-600">Success Rate</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-purple-600 mb-1">10K+</div>
+                                <div class="text-sm text-gray-600">Interviews Completed</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-green-600 mb-1">4.9/5</div>
+                                <div class="text-sm text-gray-600">User Rating</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Act I, Scene 2, Step 1: Onboarding - Role -->
-        <div id="onboarding-role-screen" class="hidden screen-container">
-            <div class="card text-center">
-                <h2 class="text-3xl font-bold text-gray-900">What role are you preparing for?</h2>
-                <div class="mt-6">
-                    <select id="role-input" class="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
-                        <option value="">Select a role...</option>
-                        <option value="Product Manager">Product Manager</option>
-                        <option value="Software Engineer">Software Engineer</option>
-                        <option value="Data Analyst">Data Analyst</option>
-                    </select>
+        <!-- Act I, Scene 2: Enhanced Onboarding - All in One -->
+        <div id="onboarding-screen" class="hidden screen-container">
+            <div class="card max-w-4xl">
+                <h2 class="text-3xl font-bold text-gray-900 text-center mb-8">Let's Personalize Your Interview Experience</h2>
+                
+                <!-- Role Selection Section -->
+                <div id="role-section" class="mb-8 p-6 border-2 border-gray-200 rounded-lg transition-all duration-300 unselected">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">1. What role are you preparing for?</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button onclick="handleRoleSelect('Product Manager')" data-value="Product Manager" class="role-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Product Manager</h4>
+                            <p class="text-sm text-gray-600 mt-1">Product strategy, user research, metrics</p>
+                        </button>
+                        <button onclick="handleRoleSelect('Software Engineer')" data-value="Software Engineer" class="role-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Software Engineer</h4>
+                            <p class="text-sm text-gray-600 mt-1">Coding, system design, algorithms</p>
+                        </button>
+                        <button onclick="handleRoleSelect('Data Analyst')" data-value="Data Analyst" class="role-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Data Analyst</h4>
+                            <p class="text-sm text-gray-600 mt-1">Data analysis, SQL, visualization</p>
+                        </button>
+                    </div>
                 </div>
-                <button id="role-next-btn" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
-            </div>
-        </div>
 
-        <!-- Act I, Scene 2, Step 2: Onboarding - Experience -->
-        <div id="onboarding-experience-screen" class="hidden screen-container">
-            <div class="card text-center">
-                <h2 class="text-3xl font-bold text-gray-900">What's your experience level?</h2>
-                <p class="text-lg text-gray-600 mt-2 mb-8">This helps us calibrate the difficulty and type of questions.</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <button onclick="handleExperienceSelect('Student/Intern')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
-                        <h3 class="text-lg font-semibold">Student / Intern</h3>
-                    </button>
-                    <button onclick="handleExperienceSelect('Junior / Mid-Level')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
-                        <h3 class="text-lg font-semibold">Junior / Mid-Level</h3>
-                    </button>
-                    <button onclick="handleExperienceSelect('Senior')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
-                        <h3 class="text-lg font-semibold">Senior</h3>
-                    </button>
-                    <button onclick="handleExperienceSelect('Manager / Lead')" class="choice-button p-6 bg-gray-100 rounded-lg text-left hover:bg-blue-50">
-                        <h3 class="text-lg font-semibold">Manager / Lead</h3>
-                    </button>
+                <!-- Experience Selection Section -->
+                <div id="experience-section" class="mb-8 p-6 border-2 border-gray-200 rounded-lg transition-all duration-300 unselected disabled">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">2. What's your experience level?</h3>
+                    <p class="text-gray-600 mb-4">This helps us calibrate the difficulty and type of questions.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="handleExperienceSelect('Student/Intern')" data-value="Student/Intern" class="experience-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Student / Intern</h4>
+                            <p class="text-sm text-gray-600 mt-1">Entry-level questions and concepts</p>
+                        </button>
+                        <button onclick="handleExperienceSelect('Junior / Mid-Level')" data-value="Junior / Mid-Level" class="experience-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Junior / Mid-Level</h4>
+                            <p class="text-sm text-gray-600 mt-1">Practical experience and problem-solving</p>
+                        </button>
+                        <button onclick="handleExperienceSelect('Senior')" data-value="Senior" class="experience-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Senior</h4>
+                            <p class="text-sm text-gray-600 mt-1">Leadership and complex scenarios</p>
+                        </button>
+                        <button onclick="handleExperienceSelect('Manager / Lead')" data-value="Manager / Lead" class="experience-btn choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200">
+                            <h4 class="font-semibold text-gray-800">Manager / Lead</h4>
+                            <p class="text-sm text-gray-600 mt-1">Team leadership and strategy</p>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Act I, Scene 2, Step 3: Onboarding - Skills to Practice -->
-        <div id="onboarding-skills-screen" class="hidden screen-container">
-            <div class="card text-center">
-                <h2 class="text-3xl font-bold text-gray-900">What skills would you like to practice?</h2>
-                <p class="text-lg text-gray-600 mt-2 mb-8">Select the skills you want to focus on during your interview practice.</p>
-                <div class="text-left">
-                    <div id="skills-options" class="space-y-3">
+                <!-- Skills Selection Section -->
+                <div id="skills-section" class="mb-8 p-6 border-2 border-gray-200 rounded-lg transition-all duration-300 hidden">
+                    <h3 class="text-xl font-semibold text-gray-800 mb-4">3. What skills would you like to practice?</h3>
+                    <p class="text-gray-600 mb-4">Select the skills you want to focus on during your interview practice.</p>
+                    <div id="skills-options" class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <!-- Skills will be populated dynamically based on role and experience -->
                     </div>
                 </div>
-                <button id="skills-next-btn" class="mt-8 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 transition duration-300">Next</button>
+
+                <!-- Continue Button -->
+                <div class="text-center">
+                    <button id="onboarding-continue-btn" class="bg-blue-600 text-white font-bold py-4 px-8 rounded-lg hover:bg-blue-700 transition duration-300 text-lg opacity-50 cursor-not-allowed" disabled>
+                        Continue to Dashboard
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -161,30 +388,166 @@
         </div>
 
         <!-- Act III, Scene 2: The Interview -->
-        <div id="interview-screen" class="hidden card flex flex-col" style="height: 90vh; max-height: 90vh;">
-            <div class="flex-grow flex flex-col md:flex-row gap-4 overflow-hidden">
-                <!-- Chat Window -->
-                <div class="flex-grow flex flex-col">
-                    <h2 class="text-xl font-semibold mb-2 text-center">Text-Based Interview in Progress</h2>
-                    <p class="text-sm text-gray-600 text-center mb-3">Type your responses below. Take your time to think and answer thoughtfully.</p>
-                    <div id="chat-window" class="flex-grow border rounded-lg p-4 overflow-y-auto flex flex-col gap-4 bg-gray-50">
-                        <!-- Chat messages appear here -->
+        <div id="interview-screen" class="hidden screen-container">
+            <div class="max-w-4xl mx-auto w-full">
+                <!-- Interview Header with Timer -->
+                <div class="flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-sm border">
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-900">AI Interview in Progress</h2>
+                        <p class="text-gray-600">Take your time to think and answer thoughtfully</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-500 mb-1">Interview Duration</div>
+                        <div id="timer" class="text-3xl font-mono font-bold text-blue-600">00:00</div>
                     </div>
                 </div>
-                <!-- Notepad & Timer -->
-                <div class="w-full md:w-64 flex-shrink-0 flex flex-col gap-4">
-                    <div class="flex-grow flex flex-col">
-                         <label for="notepad" class="font-semibold mb-1">Private Notepad</label>
-                         <textarea id="notepad" class="w-full flex-grow border rounded-lg p-2 text-sm" placeholder="Jot down your thoughts..."></textarea>
+
+                <!-- Main Chat Area -->
+                <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
+                    <!-- Chat Header -->
+                    <div class="px-6 py-4 border-b bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-gray-800">Interview Conversation</h3>
+                            <div class="flex items-center space-x-2">
+                                <div id="question-status" class="text-sm text-gray-600">
+                                    Ready to begin...
+                                </div>
+                                <div id="question-loader" class="hidden">
+                                    <div class="flex items-center space-x-2">
+                                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div id="timer" class="text-center font-mono text-lg p-2 border rounded-lg">00:00</div>
+
+                    <!-- Chat Messages Container -->
+                    <div id="chat-window" class="px-6 py-4 h-96 overflow-y-auto flex flex-col gap-4 bg-white">
+                        <!-- Welcome message -->
+                        <div class="text-center py-8 text-gray-500">
+                            <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                </svg>
+                            </div>
+                            <p class="text-lg font-medium">Your interview is starting...</p>
+                            <p class="text-sm">The AI interviewer is preparing your first question</p>
+                        </div>
+                    </div>
+
+                    <!-- Enhanced Input Area -->
+                    <div class="px-6 py-4 border-t bg-gray-50">
+                        <!-- Character Counter and Status -->
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="text-sm text-gray-500">
+                                <span id="char-count">0</span> characters
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                Press <kbd class="px-2 py-1 bg-gray-200 rounded text-xs">Enter</kbd> to send, <kbd class="px-2 py-1 bg-gray-200 rounded text-xs">Shift+Enter</kbd> for new line
+                            </div>
+                        </div>
+                        
+                        <!-- Input and Send Button -->
+                        <div class="flex gap-3">
+                            <div class="flex-grow relative">
+                                <textarea 
+                                    id="chat-input" 
+                                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200" 
+                                    rows="3" 
+                                    placeholder="Type your answer here... (Press Enter to send, Shift+Enter for new line)" 
+                                    disabled
+                                    maxlength="2000"
+                                ></textarea>
+                                <!-- Input Focus Indicator -->
+                                <div class="absolute inset-0 pointer-events-none rounded-lg transition-all duration-200" id="input-focus-indicator"></div>
+                            </div>
+                            <button 
+                                id="send-btn" 
+                                class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200 self-end flex items-center gap-2 min-w-[80px] justify-center"
+                                disabled
+                            >
+                                <span id="send-btn-text">Send</span>
+                                <svg id="send-btn-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <!-- Enhanced Loading States -->
+                        <div id="input-loading-states" class="mt-3 space-y-2">
+                            <!-- Typing Indicator -->
+                            <div id="typing-indicator" class="hidden flex items-center space-x-2 text-sm text-gray-600">
+                                <div class="flex space-x-1">
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                                </div>
+                                <span>AI is thinking...</span>
+                            </div>
+                            
+                            <!-- Processing Indicator -->
+                            <div id="processing-indicator" class="hidden flex items-center space-x-2 text-sm text-blue-600">
+                                <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                                <span>Processing your answer...</span>
+                            </div>
+                            
+                            <!-- Success Indicator -->
+                            <div id="success-indicator" class="hidden flex items-center space-x-2 text-sm text-green-600">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                                <span>Answer submitted successfully!</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Action Buttons -->
+                        <div class="mt-4 flex justify-between items-center">
+                            <div class="flex space-x-2">
+                                <button 
+                                    id="clear-input-btn" 
+                                    class="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded hover:bg-gray-100 transition duration-200"
+                                    title="Clear input"
+                                >
+                                    Clear
+                                </button>
+                                <button 
+                                    id="save-draft-btn" 
+                                    class="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded hover:bg-gray-100 transition duration-200"
+                                    title="Save as draft"
+                                >
+                                    Save Draft
+                                </button>
+                            </div>
+                            
+                            <button 
+                                id="end-interview-btn" 
+                                class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-200 flex items-center gap-2"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                End Interview & Get Feedback
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Interview Progress Bar -->
+                <div class="mt-6 bg-white rounded-lg shadow-sm border p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">Interview Progress</span>
+                        <span class="text-sm text-gray-500" id="progress-text">0% Complete</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">
+                        <span id="questions-answered">0</span> of <span id="total-questions">0</span> questions answered
+                    </div>
                 </div>
             </div>
-             <div class="flex gap-4 mt-4">
-                <textarea id="chat-input" class="flex-grow p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 resize-none" rows="3" placeholder="Type your answer... (Press Enter to send, Shift+Enter for new line)" disabled></textarea>
-                <button id="send-btn" class="bg-blue-600 text-white font-bold py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 self-end" disabled>Send</button>
-            </div>
-            <button id="end-interview-btn" class="mt-4 w-full bg-red-600 text-white font-bold py-3 px-4 rounded-md hover:bg-red-700">End Interview & Get Feedback</button>
         </div>
 
         <!-- Act IV: Analysis Loader -->
@@ -206,5 +569,68 @@
         </div>
 
     </div>
+
+    <!-- Message Templates (Hidden) -->
+    <template id="message-template">
+        <div class="chat-message flex gap-3 mb-4">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="flex-grow">
+                <div class="message-bubble p-4">
+                    <div class="message-content"></div>
+                    <div class="message-meta text-xs opacity-75 mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Loading Message Template -->
+    <template id="loading-template">
+        <div class="chat-message flex gap-3 mb-4">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="flex-grow">
+                <div class="message-bubble ai p-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-white rounded-full animate-bounce"></div>
+                        <div class="w-2 h-2 bg-white rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                        <div class="w-2 h-2 bg-white rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                        <span class="ml-2">AI is thinking...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Error Message Template -->
+    <template id="error-template">
+        <div class="chat-message flex gap-3 mb-4">
+            <div class="flex-shrink-0">
+                <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+            </div>
+            <div class="flex-grow">
+                <div class="message-bubble system p-4">
+                    <div class="message-content text-red-700"></div>
+                    <div class="message-meta text-xs opacity-75 mt-2">
+                        <button class="text-red-600 hover:text-red-800 underline retry-btn">Retry</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
 
     <script src="app.js"></script>

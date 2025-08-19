@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepAI API Debug</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">PrepAI API Debug Tool</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Test Question Generation -->
+            <div class="p-6 bg-blue-50 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Test Question Generation</h2>
+                <button id="test-questions-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mb-4">
+                    Test /api/generate-questions
+                </button>
+                <div id="questions-output" class="text-sm bg-white p-3 rounded border min-h-32">
+                    Click button to test...
+                </div>
+            </div>
+            
+            <!-- Test Health Check -->
+            <div class="p-6 bg-green-50 rounded-lg">
+                <h2 class="text-xl font-semibold mb-4">Test Health Check</h2>
+                <button id="test-health-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 mb-4">
+                    Test /health
+                </button>
+                <div id="health-output" class="text-sm bg-white p-3 rounded border min-h-32">
+                    Click button to test...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Full Response Log -->
+        <div class="mt-8 p-6 bg-gray-50 rounded-lg">
+            <h2 class="text-xl font-semibold mb-4">Full Response Log</h2>
+            <div id="full-log" class="text-sm bg-white p-3 rounded border min-h-64 font-mono overflow-auto">
+                Ready for testing...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = "https://prepai-api.onrender.com";
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-blue-600';
+            const logDiv = document.getElementById('full-log');
+            logDiv.innerHTML += `<div class="${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // Test Question Generation
+        document.getElementById('test-questions-btn').addEventListener('click', async () => {
+            const output = document.getElementById('questions-output');
+            output.innerHTML = 'Testing...';
+            
+            log('🔍 Testing question generation API...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/generate-questions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        role: 'Product Manager',
+                        seniority: 'Senior',
+                        skills: ['Product Sense', 'Metrics']
+                    })
+                });
+                
+                log(`📥 Response status: ${response.status}`);
+                log(`📥 Response headers: ${JSON.stringify([...response.headers.entries()])}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`❌ Error response: ${errorText}`, 'error');
+                    output.innerHTML = `❌ Error: ${response.status}<br>${errorText}`;
+                } else {
+                    const data = await response.json();
+                    log(`✅ Success! Received ${data.questions?.length || 0} questions`, 'success');
+                    output.innerHTML = `✅ Success!<br>Questions: ${data.questions?.length || 0}<br>Session ID: ${data.session_id || 'N/A'}`;
+                }
+                
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+                output.innerHTML = `❌ Network Error: ${error.message}`;
+            }
+        });
+        
+        // Test Health Check
+        document.getElementById('test-health-btn').addEventListener('click', async () => {
+            const output = document.getElementById('health-output');
+            output.innerHTML = 'Testing...';
+            
+            log('🔍 Testing health check API...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/health`);
+                
+                log(`📥 Health check status: ${response.status}`);
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`❌ Health check error: ${errorText}`, 'error');
+                    output.innerHTML = `❌ Error: ${response.status}<br>${errorText}`;
+                } else {
+                    const data = await response.json();
+                    log(`✅ Health check success: ${JSON.stringify(data)}`, 'success');
+                    output.innerHTML = `✅ Healthy!<br>Status: ${data.status}<br>Database: ${data.database}`;
+                }
+                
+            } catch (error) {
+                log(`❌ Health check network error: ${error.message}`, 'error');
+                output.innerHTML = `❌ Network Error: ${error.message}`;
+            }
+        });
+        
+        // Initial log
+        log('🚀 PrepAI API Debug Tool Ready');
+        log(`🔗 API Base URL: ${API_BASE_URL}`);
+    </script>
+</body>
+</html>

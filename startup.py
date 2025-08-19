@@ -8,6 +8,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from sqlalchemy import text
 
 # Add the current directory to Python path
 sys.path.append(str(Path(__file__).parent))
@@ -23,10 +24,13 @@ def run_startup_checks():
     required_vars = ['DATABASE_URL', 'GOOGLE_API_KEY']
     
     for var in required_vars:
-        if not os.getenv(var):
+        value = os.getenv(var)
+        if not value:
             print(f"❌ Warning: {var} not set")
         else:
-            print(f"✅ {var} is configured")
+            # Show first 10 characters for debugging (safe for API keys)
+            display_value = value[:10] + "..." if len(value) > 10 else value
+            print(f"✅ {var} is configured: {display_value}")
     
     # Wait for database to be ready (important for Render)
     print("\n⏳ Waiting for database connection...")
@@ -38,7 +42,7 @@ def run_startup_checks():
             from models import engine, Base
             # Test connection using SQLAlchemy 2.0+ syntax
             with engine.connect() as conn:
-                result = conn.execute("SELECT 1")
+                result = conn.execute(text("SELECT 1"))
                 result.fetchone()  # Consume the result
             print("✅ Database connection successful")
             break

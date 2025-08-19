@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepAI Frontend Test</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="p-8">
+    <div class="max-w-2xl mx-auto">
+        <h1 class="text-3xl font-bold mb-6">PrepAI Frontend Test</h1>
+        
+        <div class="space-y-4">
+            <button id="test-api-btn" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                Test API Connection
+            </button>
+            
+            <button id="test-interview-btn" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                Test Interview Start
+            </button>
+            
+            <div id="output" class="mt-6 p-4 bg-gray-100 rounded min-h-32">
+                <p class="text-gray-600">Output will appear here...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const output = document.getElementById('output');
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'text-red-600' : type === 'success' ? 'text-green-600' : 'text-blue-600';
+            output.innerHTML += `<p class="${color} text-sm">[${timestamp}] ${message}</p>`;
+            output.scrollTop = output.scrollTop + 1000;
+        }
+        
+        // Test basic API connection
+        document.getElementById('test-api-btn').addEventListener('click', async () => {
+            log('🔍 Testing API connection...');
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/generate-questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        role: 'Product Manager',
+                        seniority: 'Senior',
+                        skills: ['Product Sense', 'Metrics']
+                    })
+                });
+                
+                log(`📥 Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Success! Received ${data.questions.length} questions`, 'success');
+                    log(`📋 First question: ${data.questions[0].question_text.substring(0, 100)}...`, 'success');
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Error: ${response.status} - ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+            }
+        });
+        
+        // Test interview start (simulating the actual app flow)
+        document.getElementById('test-interview-btn').addEventListener('click', async () => {
+            log('🎯 Testing interview start flow...');
+            
+            // Simulate the interviewConfig that would normally be set
+            const interviewConfig = {
+                role: 'Product Manager',
+                seniority: 'Senior',
+                skills: ['Product Sense', 'Metrics']
+            };
+            
+            log(`📋 Interview config: ${JSON.stringify(interviewConfig)}`);
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/generate-questions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(interviewConfig)
+                });
+                
+                log(`📥 Response status: ${response.status}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Interview started successfully!`, 'success');
+                    log(`📝 Questions received: ${data.questions.length}`, 'success');
+                    
+                    // Simulate what the app would do
+                    const questions = data.questions;
+                    const interviewId = Date.now();
+                    
+                    log(`🆔 Interview ID: ${interviewId}`, 'success');
+                    log(`❓ First question: ${questions[0].question_text.substring(0, 80)}...`, 'success');
+                    
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Error: ${response.status} - ${errorText}`, 'error');
+                }
+                
+            } catch (error) {
+                log(`❌ Network error: ${error.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
