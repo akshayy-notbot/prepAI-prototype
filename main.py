@@ -3,6 +3,10 @@ import json
 from typing import List, Dict, Any
 from datetime import datetime
 
+# Load environment variables from .env file if it exists
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -80,12 +84,11 @@ def get_db():
 # --- Gemini API Configuration ---
 def get_gemini_client():
     """Get configured Gemini client with API key"""
-    # WARNING: Storing API keys in code is insecure. This is for local testing only.
-    # In production, use environment variables
-    GOOGLE_API_KEY = "AIzaSyAx-lbk6L--IuSvKPSrSd6G1JzC-nKvPAg"
+    # Get API key from environment variable (secure)
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     
-    if GOOGLE_API_KEY == "paste_your_google_api_key_here":
-        raise ValueError("Please update the GOOGLE_API_KEY in main.py with your actual API key")
+    if not GOOGLE_API_KEY:
+        raise ValueError("GOOGLE_API_KEY environment variable not set. Please configure it in Render dashboard.")
     
     genai.configure(api_key=GOOGLE_API_KEY)
     return genai.GenerativeModel('gemini-1.5-flash')

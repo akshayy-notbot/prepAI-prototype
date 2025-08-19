@@ -173,7 +173,7 @@ async function startInterview() {
 
 // New function to generate questions using Gemini API
 async function generateQuestionsWithGemini() {
-    const API_BASE_URL = "http://127.0.0.1:8000"; // Your local backend for Gemini calls
+    const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
     
     console.log('🔍 Starting question generation...');
     console.log('📡 API URL:', API_BASE_URL);
@@ -259,8 +259,8 @@ async function endInterview() {
     showScreen('analysis');
     console.log("Interview ended. Sending transcript and waiting for analysis...");
 
-    // Use the same local backend URL for consistency
-    const API_BASE_URL = "http://127.0.0.1:8000"; 
+    // Use the live Render backend URL
+    const API_BASE_URL = "https://prepai-api.onrender.com"; 
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/interviews/${interviewId}/complete`, {
