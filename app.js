@@ -44,6 +44,38 @@ console.log('🔧 Configuration loaded:', {
     PREPAI_CONFIG: window.PREPAI_CONFIG
 });
 
+// Configuration validation function
+function validateConfiguration() {
+    console.log('🔧 Validating configuration...');
+    console.log('🔧 window.PREPAI_CONFIG exists:', !!window.PREPAI_CONFIG);
+    console.log('🔧 window.PREPAI_CONFIG_FULL exists:', !!window.PREPAI_CONFIG_FULL);
+    
+    if (window.PREPAI_CONFIG) {
+        console.log('🔧 Current config:', window.PREPAI_CONFIG);
+        console.log('🔧 API_BASE_URL from config:', window.PREPAI_CONFIG.API_BASE_URL);
+        console.log('🔧 WS_BASE_URL from config:', window.PREPAI_CONFIG.WS_BASE_URL);
+    }
+    
+    console.log('🔧 Final BACKEND_URL:', BACKEND_URL);
+    console.log('🔧 Final WS_BASE_URL:', WS_BASE_URL);
+    
+    // Check if we're using fallback values
+    if (BACKEND_URL === 'https://prepai-api.onrender.com' && !window.PREPAI_CONFIG) {
+        console.warn('⚠️ Using fallback BACKEND_URL - config.js may not be loaded properly');
+    }
+    
+    if (WS_BASE_URL === 'wss://prepai-api.onrender.com' && !window.PREPAI_CONFIG) {
+        console.warn('⚠️ Using fallback WS_BASE_URL - config.js may not be loaded properly');
+    }
+}
+
+// Run configuration validation when page loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', validateConfiguration);
+} else {
+    validateConfiguration();
+}
+
 // --- WebSocket Functions ---
 function establishWebSocketConnection(sessionId) {
     console.log('🔌 Establishing WebSocket connection for session:', sessionId);
@@ -766,8 +798,16 @@ async function generateQuestionsWithGemini() {
 async function startOrchestratorInterview() {
     const API_BASE_URL = BACKEND_URL;
     
+    // Debug logging to see exactly what URLs are being used
+    console.log('🔧 Debug: Configuration check in startOrchestratorInterview');
+    console.log('🔧 Debug: BACKEND_URL =', BACKEND_URL);
+    console.log('🔧 Debug: API_BASE_URL =', API_BASE_URL);
+    console.log('🔧 Debug: window.PREPAI_CONFIG =', window.PREPAI_CONFIG);
+    console.log('🔧 Debug: Full config object =', window.PREPAI_CONFIG_FULL);
+    
     try {
         console.log('🚀 Starting orchestrator interview with config:', interviewConfig);
+        console.log('🚀 Using API endpoint:', `${API_BASE_URL}/api/start-interview`);
         
         const response = await fetch(`${API_BASE_URL}/api/start-interview`, {
             method: 'POST',
@@ -792,6 +832,12 @@ async function startOrchestratorInterview() {
 
     } catch (error) {
         console.error('❌ Error starting orchestrator interview:', error);
+        console.error('❌ Error details:', {
+            message: error.message,
+            stack: error.stack,
+            BACKEND_URL,
+            API_BASE_URL
+        });
         throw error;
     }
 }

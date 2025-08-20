@@ -11,15 +11,15 @@ const CONFIG = {
     
     // Production Environment (Render)
     production: {
-        API_BASE_URL: "https://your-service-name.onrender.com", // UPDATE THIS with your actual Render URL
-        WS_BASE_URL: "wss://your-service-name.onrender.com",   // UPDATE THIS with your actual Render URL
+        API_BASE_URL: "https://prepai-api.onrender.com", // Your Render backend URL
+        WS_BASE_URL: "wss://prepai-api.onrender.com",   // Your Render WebSocket URL
         ENVIRONMENT: "production"
     },
     
     // GitHub Pages Environment
     githubPages: {
-        API_BASE_URL: "https://your-service-name.onrender.com", // UPDATE THIS with your actual Render URL
-        WS_BASE_URL: "wss://your-service-name.onrender.com",   // UPDATE THIS with your actual Render URL
+        API_BASE_URL: "https://prepai-api.onrender.com", // Your Render backend URL
+        WS_BASE_URL: "wss://prepai-api.onrender.com",   // Your Render WebSocket URL
         ENVIRONMENT: "production"
     }
 };

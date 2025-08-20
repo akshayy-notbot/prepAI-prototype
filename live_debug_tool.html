@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepAI Live Debug Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .debug-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .debug-section h3 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .status-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            background: #fafafa;
+        }
+        .status-card h4 {
+            margin-top: 0;
+            color: #444;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online { background-color: #28a745; }
+        .status-offline { background-color: #dc3545; }
+        .status-connecting { background-color: #ffc107; }
+        .log-container {
+            background-color: #1e1e1e;
+            color: #00ff00;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 15px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+        }
+        .control-panel {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-danger { background-color: #dc3545; color: white; }
+        .btn:hover { opacity: 0.8; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .metric {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+        }
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .metric-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 PrepAI Live Debug Tool</h1>
+        <p>Real-time monitoring of your interview system during actual usage</p>
+    </div>
+
+    <!-- Control Panel -->
+    <div class="debug-section">
+        <h3>🎮 Control Panel</h3>
+        <div class="control-panel">
+            <button class="btn btn-primary" onclick="startMonitoring()">Start Monitoring</button>
+            <button class="btn btn-success" onclick="testBackendConnection()">Test Backend</button>
+            <button class="btn btn-warning" onclick="testWebSocketConnection()">Test WebSocket</button>
+            <button class="btn btn-danger" onclick="clearLogs()">Clear Logs</button>
+            <button class="btn btn-primary" onclick="exportDebugData()">Export Data</button>
+        </div>
+    </div>
+
+    <!-- Real-Time Status -->
+    <div class="debug-section">
+        <h3>📊 Real-Time Status</h3>
+        <div class="status-grid">
+            <div class="status-card">
+                <h4>Backend API</h4>
+                <div id="backend-status">
+                    <span class="status-indicator status-offline"></span>
+                    <span>Offline</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>WebSocket</h4>
+                <div id="websocket-status">
+                    <span class="status-indicator status-offline"></span>
+                    <span>Offline</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>Database</h4>
+                <div id="database-status">
+                    <span class="status-indicator status-offline"></span>
+                    <span>Offline</span>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>Redis</h4>
+                <div id="redis-status">
+                    <span class="status-indicator status-offline"></span>
+                    <span>Offline</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Connection Details -->
+        <div class="status-grid" style="margin-top: 20px;">
+            <div class="status-card">
+                <h4>Connection Details</h4>
+                <div id="connection-details">
+                    <p><strong>Backend URL:</strong> <span id="backend-url">Loading...</span></p>
+                    <p><strong>WebSocket URL:</strong> <span id="websocket-url">Loading...</span></p>
+                    <p><strong>Last Check:</strong> <span id="last-check">Never</span></p>
+                    <p><strong>Network Status:</strong> <span id="network-status">Unknown</span></p>
+                </div>
+            </div>
+            <div class="status-card">
+                <h4>Session Info</h4>
+                <div id="session-info">
+                    <p><strong>Current Session:</strong> <span id="current-session">None</span></p>
+                    <p><strong>Active Connections:</strong> <span id="active-connections">0</span></p>
+                    <p><strong>Connection Time:</strong> <span id="connection-time">0ms</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="debug-section">
+        <h3>⚡ Performance Metrics</h3>
+        <div class="metrics">
+            <div class="metric">
+                <div class="metric-value" id="response-time">0</div>
+                <div class="metric-label">Response Time (ms)</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="api-calls">0</div>
+                <div class="metric-label">API Calls</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="websocket-messages">0</div>
+                <div class="metric-label">WS Messages</div>
+            </div>
+            <div class="metric">
+                <div class="metric-value" id="errors">0</div>
+                <div class="metric-label">Errors</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Logs -->
+    <div class="debug-section">
+        <h3>📝 Live Debug Logs</h3>
+        <div class="log-container" id="debug-logs"></div>
+    </div>
+
+    <script>
+        // Debug state
+        let isMonitoring = false;
+        let websocket = null;
+        let metrics = {
+            responseTime: 0,
+            apiCalls: 0,
+            websocketMessages: 0,
+            errors: 0
+        };
+        
+        // Configuration
+        const BACKEND_URL = 'https://prepai-api.onrender.com';
+        const WS_URL = 'wss://prepai-api.onrender.com';
+
+        function log(message, type = 'INFO') {
+            const logs = document.getElementById('debug-logs');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${type}: ${message}\n`;
+            logs.innerHTML += logEntry;
+            logs.scrollTop = logs.scrollHeight;
+            
+            console.log(`[${type}] ${message}`);
+        }
+
+        function updateStatus(elementId, status, isOnline) {
+            const element = document.getElementById(elementId);
+            const indicator = element.querySelector('.status-indicator');
+            const text = element.querySelector('span:last-child');
+            
+            indicator.className = `status-indicator ${isOnline ? 'status-online' : 'status-offline'}`;
+            text.textContent = status;
+        }
+
+        function updateConnectionDetails() {
+            document.getElementById('backend-url').textContent = BACKEND_URL;
+            document.getElementById('websocket-url').textContent = WS_URL;
+            document.getElementById('last-check').textContent = new Date().toLocaleTimeString();
+            document.getElementById('network-status').textContent = navigator.onLine ? 'Online' : 'Offline';
+        }
+
+        function updateSessionInfo(sessionId = null, activeConnections = 0, connectionTime = 0) {
+            document.getElementById('current-session').textContent = sessionId || 'None';
+            document.getElementById('active-connections').textContent = activeConnections;
+            document.getElementById('connection-time').textContent = connectionTime + 'ms';
+        }
+
+        function updateMetric(metricId, value) {
+            document.getElementById(metricId).textContent = value;
+        }
+
+        function startMonitoring() {
+            if (isMonitoring) {
+                log('Monitoring already active', 'WARNING');
+                return;
+            }
+            
+            isMonitoring = true;
+            log('🚀 Starting live monitoring...', 'INFO');
+            
+            // Start periodic health checks
+            setInterval(checkBackendHealth, 5000);
+            setInterval(checkWebSocketInfo, 3000);
+            
+            // Initial checks
+            checkBackendHealth();
+            checkWebSocketInfo();
+            
+            log('✅ Live monitoring started', 'SUCCESS');
+        }
+
+        async function checkBackendHealth() {
+            try {
+                const startTime = Date.now();
+                const response = await fetch(`${BACKEND_URL}/health`);
+                const responseTime = Date.now() - startTime;
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('backend-status', 'Healthy', true);
+                    updateMetric('response-time', responseTime);
+                    updateMetric('api-calls', ++metrics.apiCalls);
+                    log(`Backend health check: ${responseTime}ms - ${data.status}`, 'SUCCESS');
+                } else {
+                    updateStatus('backend-status', `Error ${response.status}`, false);
+                    updateMetric('errors', ++metrics.errors);
+                    log(`Backend health check failed: ${response.status}`, 'ERROR');
+                }
+                
+                // Update connection details
+                updateConnectionDetails();
+                
+            } catch (error) {
+                updateStatus('backend-status', 'Connection Failed', false);
+                updateMetric('errors', ++metrics.errors);
+                log(`Backend connection error: ${error.message}`, 'ERROR');
+                updateConnectionDetails();
+            }
+        }
+
+        async function checkWebSocketInfo() {
+            try {
+                const response = await fetch(`${BACKEND_URL}/websocket-info`);
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('database-status', 'Connected', true);
+                    updateStatus('redis-status', 'Connected', true);
+                    log(`WebSocket info: ${data.active_connections} active connections`, 'INFO');
+                    
+                    // Update session info
+                    updateSessionInfo(null, data.active_connections, 0);
+                }
+            } catch (error) {
+                log(`WebSocket info check failed: ${error.message}`, 'ERROR');
+            }
+        }
+
+        async function testBackendConnection() {
+            log('🧪 Testing backend connection...', 'INFO');
+            
+            try {
+                // Test health endpoint
+                const healthResponse = await fetch(`${BACKEND_URL}/health`);
+                log(`Health endpoint: ${healthResponse.status}`, healthResponse.ok ? 'SUCCESS' : 'ERROR');
+                
+                // Test WebSocket info
+                const wsInfoResponse = await fetch(`${BACKEND_URL}/websocket-info`);
+                log(`WebSocket info: ${wsInfoResponse.status}`, wsInfoResponse.ok ? 'SUCCESS' : 'ERROR');
+                
+                // Test interview start
+                const interviewData = {
+                    role: 'Software Engineer',
+                    seniority: 'Junior',
+                    skills: ['Python', 'JavaScript']
+                };
+                
+                const startTime = Date.now();
+                const interviewResponse = await fetch(`${BACKEND_URL}/api/start-interview`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(interviewData)
+                });
+                const responseTime = Date.now() - startTime;
+                
+                if (interviewResponse.ok) {
+                    const data = await interviewResponse.json();
+                    log(`Interview start: SUCCESS - Session: ${data.session_id}`, 'SUCCESS');
+                    log(`Response time: ${responseTime}ms`, 'INFO');
+                    
+                    // Test WebSocket connection with this session
+                    testWebSocketWithSession(data.session_id);
+                } else {
+                    log(`Interview start: FAILED - ${interviewResponse.status}`, 'ERROR');
+                }
+                
+            } catch (error) {
+                log(`Backend test failed: ${error.message}`, 'ERROR');
+            }
+        }
+
+        function testWebSocketConnection() {
+            log('🔌 Testing WebSocket connection...', 'INFO');
+            
+            if (websocket && websocket.readyState === WebSocket.OPEN) {
+                websocket.close();
+            }
+            
+            const testSessionId = 'debug-test-' + Date.now();
+            const wsUrl = `${WS_URL}/ws/${testSessionId}`;
+            
+            log(`Connecting to: ${wsUrl}`, 'INFO');
+            updateStatus('websocket-status', 'Connecting...', false);
+            
+            websocket = new WebSocket(wsUrl);
+            
+            websocket.onopen = function(event) {
+                updateStatus('websocket-status', 'Connected', true);
+                log('✅ WebSocket connection established', 'SUCCESS');
+                
+                // Send test message
+                const testMessage = {
+                    type: 'debug_test',
+                    message: 'Hello from debug tool',
+                    timestamp: new Date().toISOString()
+                };
+                websocket.send(JSON.stringify(testMessage));
+                log('📤 Test message sent', 'INFO');
+            };
+            
+            websocket.onmessage = function(event) {
+                updateMetric('websocket-messages', ++metrics.websocketMessages);
+                log(`📨 Message received: ${event.data}`, 'SUCCESS');
+            };
+            
+            websocket.onclose = function(event) {
+                updateStatus('websocket-status', 'Disconnected', false);
+                log(`🔌 WebSocket closed: ${event.code} - ${event.reason}`, 'WARNING');
+            };
+            
+            websocket.onerror = function(error) {
+                updateStatus('websocket-status', 'Error', false);
+                updateMetric('errors', ++metrics.errors);
+                log(`❌ WebSocket error: ${error}`, 'ERROR');
+            };
+        }
+
+        function testWebSocketWithSession(sessionId) {
+            log(`🔌 Testing WebSocket with session: ${sessionId}`, 'INFO');
+            
+            const startTime = Date.now();
+            const wsUrl = `${WS_URL}/ws/${sessionId}`;
+            log(`Connecting to: ${wsUrl}`, 'INFO');
+            
+            const sessionWs = new WebSocket(wsUrl);
+            
+            sessionWs.onopen = function(event) {
+                const connectionTime = Date.now() - startTime;
+                log(`✅ WebSocket connected with session ${sessionId}`, 'SUCCESS');
+                log(`Connection time: ${connectionTime}ms`, 'INFO');
+                
+                // Update session info
+                updateSessionInfo(sessionId, 1, connectionTime);
+                
+                // Send test message
+                const testMessage = {
+                    type: 'session_test',
+                    message: 'Testing session WebSocket',
+                    session_id: sessionId,
+                    timestamp: new Date().toISOString()
+                };
+                sessionWs.send(JSON.stringify(testMessage));
+                log('📤 Session test message sent', 'INFO');
+            };
+            
+            sessionWs.onmessage = function(event) {
+                log(`📨 Session message: ${event.data}`, 'SUCCESS');
+            };
+            
+            sessionWs.onclose = function(event) {
+                log(`🔌 Session WebSocket closed: ${event.code}`, 'WARNING');
+                updateSessionInfo(null, 0, 0);
+            };
+            
+            sessionWs.onerror = function(error) {
+                log(`❌ Session WebSocket error: ${error}`, 'ERROR');
+                updateSessionInfo(null, 0, 0);
+            };
+        }
+
+        function clearLogs() {
+            document.getElementById('debug-logs').innerHTML = '';
+            log('🧹 Logs cleared', 'INFO');
+        }
+
+        function exportDebugData() {
+            const debugData = {
+                timestamp: new Date().toISOString(),
+                metrics: metrics,
+                backend_url: BACKEND_URL,
+                websocket_url: WS_URL
+            };
+            
+            const dataStr = JSON.stringify(debugData, null, 2);
+            const dataBlob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `prepai-debug-data-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            log('📁 Debug data exported', 'INFO');
+        }
+
+        // Initialize
+        window.onload = function() {
+            log('🔍 PrepAI Live Debug Tool initialized', 'INFO');
+            log('Click "Start Monitoring" to begin real-time debugging', 'INFO');
+            log('Use this tool while testing your actual interview system', 'INFO');
+            
+            // Show initial connection details
+            updateConnectionDetails();
+            updateSessionInfo();
+            
+            // Auto-check backend status on load
+            setTimeout(() => {
+                checkBackendHealth();
+                checkWebSocketInfo();
+            }, 1000);
+        };
+
+        // Add error handling for unhandled errors
+        window.addEventListener('error', function(event) {
+            log(`❌ Unhandled error: ${event.error}`, 'ERROR');
+            updateMetric('errors', ++metrics.errors);
+        });
+
+        // Add unhandled promise rejection handling
+        window.addEventListener('unhandledrejection', function(event) {
+            log(`❌ Unhandled promise rejection: ${event.reason}`, 'ERROR');
+            updateMetric('errors', ++metrics.errors);
+        });
+
+        // Add network status monitoring
+        window.addEventListener('online', function() {
+            log('🌐 Network: Online', 'SUCCESS');
+        });
+
+        window.addEventListener('offline', function() {
+            log('🌐 Network: Offline', 'ERROR');
+        });
+    </script>
+</body>
+</html>
