@@ -25,9 +25,6 @@
             border-radius: 1rem;
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
         }
-        .chat-bubble { max-width: 75%; padding: 12px 16px; border-radius: 16px; word-wrap: break-word; }
-        .chat-bubble-user { background-color: #2563eb; color: white; border-bottom-right-radius: 4px; }
-        .chat-bubble-ai { background-color: #e5e7eb; color: #1f2937; border-bottom-left-radius: 4px; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .choice-button { transition: all 0.2s ease-in-out; }
@@ -81,23 +78,25 @@
         }
         
         .message-bubble {
-            max-width: 80%;
+            max-width: 85%;
             word-wrap: break-word;
-            line-height: 1.5;
+            line-height: 1.6;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
         
         .message-bubble.user {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
             color: white;
             border-radius: 18px 18px 4px 18px;
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+            margin-left: auto;
         }
         
         .message-bubble.ai {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: white;
             border-radius: 18px 18px 18px 4px;
-            box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
         }
         
         .message-bubble.system {
@@ -106,21 +105,18 @@
             border: 1px solid #e2e8f0;
             border-radius: 12px;
             font-style: italic;
+            max-width: 100%;
         }
         
-        /* Enhanced Input Styles */
+        /* Professional Input Styles */
         .chat-input-container {
             position: relative;
             transition: all 0.2s ease;
         }
         
         .chat-input-container:focus-within {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-        }
-        
-        .chat-input-container:focus-within #input-focus-indicator {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
         }
         
         /* Progress Bar Animation */
@@ -145,6 +141,26 @@
             50% { opacity: .5; }
         }
         
+        /* Professional Button Hover Effects */
+        .btn-hover-lift {
+            transition: all 0.2s ease;
+        }
+        
+        .btn-hover-lift:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        /* Enhanced Focus States */
+        .focus-ring {
+            transition: all 0.2s ease;
+        }
+        
+        .focus-ring:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
         /* Responsive Design */
         @media (max-width: 768px) {
             .message-bubble {
@@ -157,6 +173,10 @@
             
             #chat-window {
                 height: 60vh;
+            }
+            
+            .chat-message {
+                gap: 3;
             }
         }
     </style>
@@ -390,82 +410,89 @@
         <!-- Act III, Scene 2: The Interview -->
         <div id="interview-screen" class="hidden screen-container">
             <div class="max-w-4xl mx-auto w-full">
-                <!-- Interview Header with Timer -->
-                <div class="flex justify-between items-center mb-6 p-4 bg-white rounded-lg shadow-sm border">
-                    <div>
-                        <h2 class="text-2xl font-bold text-gray-900">AI Interview in Progress</h2>
-                        <p class="text-gray-600">Take your time to think and answer thoughtfully</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-sm text-gray-500 mb-1">Interview Duration</div>
-                        <div id="timer" class="text-3xl font-mono font-bold text-blue-600">00:00</div>
+                <!-- Interview Screen Header -->
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-6">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h2 class="text-2xl font-bold text-gray-900 mb-2">AI Interview Session</h2>
+                            <p class="text-gray-600">Take your time to think and answer thoughtfully</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold text-gray-600 mb-2">Interview Duration</div>
+                            <div id="timer" class="text-4xl font-mono font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">00:00</div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- Main Chat Area -->
-                <div class="bg-white rounded-lg shadow-sm border overflow-hidden">
-                    <!-- Chat Header -->
-                    <div class="px-6 py-4 border-b bg-gray-50">
+                <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                    <!-- Professional Chat Header -->
+                    <div class="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
                         <div class="flex items-center justify-between">
-                            <h3 class="font-semibold text-gray-800">Interview Conversation</h3>
-                            <div class="flex items-center space-x-2">
-                                <div id="question-status" class="text-sm text-gray-600">
-                                    Ready to begin...
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                                    </svg>
                                 </div>
+                                <div>
+                                    <h3 class="font-semibold text-gray-900 text-lg">AI Interview Session</h3>
+                                    <p class="text-sm text-gray-600" id="question-status">Ready to begin...</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
                                 <div id="question-loader" class="hidden">
-                                    <div class="flex items-center space-x-2">
-                                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                                        <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                                    <div class="flex items-center space-x-1">
+                                        <div class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></div>
+                                        <div class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                                        <div class="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Chat Messages Container -->
-                    <div id="chat-window" class="px-6 py-4 h-96 overflow-y-auto flex flex-col gap-4 bg-white">
+                    <!-- Professional Chat Messages Container -->
+                    <div id="chat-window" class="px-6 py-6 h-96 overflow-y-auto flex flex-col gap-6 bg-white">
                         <!-- Welcome message -->
-                        <div class="text-center py-8 text-gray-500">
-                            <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-                                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        <div class="text-center py-12 text-gray-600">
+                            <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl flex items-center justify-center">
+                                <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                                 </svg>
                             </div>
-                            <p class="text-lg font-medium">Your interview is starting...</p>
-                            <p class="text-sm">The AI interviewer is preparing your first question</p>
+                            <h3 class="text-xl font-semibold text-gray-800 mb-2">Interview Session Initializing</h3>
+                            <p class="text-gray-500">Preparing your personalized interview experience...</p>
                         </div>
                     </div>
 
-                    <!-- Enhanced Input Area -->
-                    <div class="px-6 py-4 border-t bg-gray-50">
-                        <!-- Character Counter and Status -->
+                    <!-- Professional Input Area -->
+                    <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                        <!-- Character Counter and Instructions -->
                         <div class="flex justify-between items-center mb-3">
                             <div class="text-sm text-gray-500">
-                                <span id="char-count">0</span> characters
+                                <span id="char-count">0</span>/2000 characters
                             </div>
                             <div class="text-sm text-gray-500">
-                                Press <kbd class="px-2 py-1 bg-gray-200 rounded text-xs">Enter</kbd> to send, <kbd class="px-2 py-1 bg-gray-200 rounded text-xs">Shift+Enter</kbd> for new line
+                                Press <kbd class="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">Enter</kbd> to send
                             </div>
                         </div>
                         
-                        <!-- Input and Send Button -->
+                        <!-- Professional Input and Send Button -->
                         <div class="flex gap-3">
                             <div class="flex-grow relative">
                                 <textarea 
                                     id="chat-input" 
-                                    class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200" 
+                                    class="w-full p-4 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all duration-200 font-medium text-gray-800 placeholder-gray-400" 
                                     rows="3" 
-                                    placeholder="Type your answer here... (Press Enter to send, Shift+Enter for new line)" 
+                                    placeholder="Provide your detailed response to the interview question..." 
                                     disabled
                                     maxlength="2000"
                                 ></textarea>
-                                <!-- Input Focus Indicator -->
-                                <div class="absolute inset-0 pointer-events-none rounded-lg transition-all duration-200" id="input-focus-indicator"></div>
                             </div>
                             <button 
                                 id="send-btn" 
-                                class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition duration-200 self-end flex items-center gap-2 min-w-[80px] justify-center"
+                                class="bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-4 px-6 rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all duration-200 self-end flex items-center gap-2 min-w-[90px] justify-center shadow-sm hover:shadow-md"
                                 disabled
                             >
                                 <span id="send-btn-text">Send</span>
@@ -475,76 +502,69 @@
                             </button>
                         </div>
                         
-                        <!-- Enhanced Loading States -->
-                        <div id="input-loading-states" class="mt-3 space-y-2">
+                        <!-- Professional Loading States -->
+                        <div id="input-loading-states" class="mt-4 space-y-3">
                             <!-- Typing Indicator -->
-                            <div id="typing-indicator" class="hidden flex items-center space-x-2 text-sm text-gray-600">
+                            <div id="typing-indicator" class="hidden flex items-center space-x-3 text-sm text-gray-600 bg-white px-4 py-3 rounded-lg border border-gray-200">
                                 <div class="flex space-x-1">
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                                    <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                                    <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                                    <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                                    <div class="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
                                 </div>
-                                <span>AI is thinking...</span>
+                                <span class="font-medium">AI is analyzing your response...</span>
                             </div>
                             
                             <!-- Processing Indicator -->
-                            <div id="processing-indicator" class="hidden flex items-center space-x-2 text-sm text-blue-600">
+                            <div id="processing-indicator" class="hidden flex items-center space-x-3 text-sm text-blue-600 bg-blue-50 px-4 py-3 rounded-lg border border-blue-200">
                                 <div class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                                <span>Processing your answer...</span>
+                                <span class="font-medium">Processing your answer...</span>
                             </div>
                             
                             <!-- Success Indicator -->
-                            <div id="success-indicator" class="hidden flex items-center space-x-2 text-sm text-green-600">
+                            <div id="success-indicator" class="hidden flex items-center space-x-3 text-sm text-green-600 bg-green-50 px-4 py-3 rounded-lg border border-green-200">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                                 </svg>
-                                <span>Answer submitted successfully!</span>
+                                <span class="font-medium">Response submitted successfully</span>
                             </div>
                         </div>
                         
-                        <!-- Action Buttons -->
+                        <!-- Professional Action Buttons -->
                         <div class="mt-4 flex justify-between items-center">
                             <div class="flex space-x-2">
                                 <button 
                                     id="clear-input-btn" 
-                                    class="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded hover:bg-gray-100 transition duration-200"
+                                    class="text-gray-500 hover:text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-100 transition duration-200 font-medium"
                                     title="Clear input"
                                 >
-                                    Clear
-                                </button>
-                                <button 
-                                    id="save-draft-btn" 
-                                    class="text-gray-500 hover:text-gray-700 text-sm px-3 py-1 rounded hover:bg-gray-100 transition duration-200"
-                                    title="Save as draft"
-                                >
-                                    Save Draft
+                                    Clear Input
                                 </button>
                             </div>
                             
                             <button 
                                 id="end-interview-btn" 
-                                class="bg-red-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-red-700 transition duration-200 flex items-center gap-2"
+                                class="bg-gradient-to-r from-red-600 to-red-700 text-white font-semibold py-3 px-6 rounded-xl hover:from-red-700 hover:to-red-800 transition duration-200 flex items-center gap-2 shadow-sm hover:shadow-md"
                             >
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                                 </svg>
-                                End Interview & Get Feedback
+                                Complete Interview
                             </button>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Interview Progress Bar -->
-                <div class="mt-6 bg-white rounded-lg shadow-sm border p-4">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-sm font-medium text-gray-700">Interview Progress</span>
-                        <span class="text-sm text-gray-500" id="progress-text">0% Complete</span>
+                <!-- Professional Interview Progress Bar -->
+                <div class="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-sm font-semibold text-gray-800">Interview Progress</span>
+                        <span class="text-sm font-medium text-gray-600" id="progress-text">0% Complete</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
-                        <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+                    <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                        <div id="progress-bar" class="bg-gradient-to-r from-blue-600 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm" style="width: 0%"></div>
                     </div>
-                    <div class="mt-2 text-xs text-gray-500">
-                        <span id="questions-answered">0</span> of <span id="total-questions">0</span> questions answered
+                    <div class="mt-3 text-sm text-gray-500 font-medium">
+                        <span id="questions-answered">0</span> of <span id="total-questions">0</span> questions completed
                     </div>
                 </div>
             </div>
@@ -570,63 +590,63 @@
 
     </div>
 
-    <!-- Message Templates (Hidden) -->
+    <!-- Professional Message Templates (Hidden) -->
     <template id="message-template">
-        <div class="chat-message flex gap-3 mb-4">
+        <div class="chat-message flex gap-4 mb-6">
             <div class="flex-shrink-0">
-                <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                    <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                     </svg>
                 </div>
             </div>
             <div class="flex-grow">
-                <div class="message-bubble p-4">
-                    <div class="message-content"></div>
-                    <div class="message-meta text-xs opacity-75 mt-2"></div>
+                <div class="message-bubble p-4 rounded-xl">
+                    <div class="message-content text-gray-800 leading-relaxed"></div>
+                    <div class="message-meta text-xs text-gray-500 mt-3 font-mono"></div>
                 </div>
             </div>
         </div>
     </template>
 
-    <!-- Loading Message Template -->
+    <!-- Professional Loading Message Template -->
     <template id="loading-template">
-        <div class="chat-message flex gap-3 mb-4">
+        <div class="chat-message flex gap-4 mb-6">
             <div class="flex-shrink-0">
-                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                     <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                     </svg>
                 </div>
             </div>
             <div class="flex-grow">
-                <div class="message-bubble ai p-4">
-                    <div class="flex items-center space-x-2">
+                <div class="message-bubble ai p-4 rounded-xl">
+                    <div class="flex items-center space-x-3">
                         <div class="w-2 h-2 bg-white rounded-full animate-bounce"></div>
                         <div class="w-2 h-2 bg-white rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
                         <div class="w-2 h-2 bg-white rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                        <span class="ml-2">AI is thinking...</span>
+                        <span class="ml-2 text-white font-medium">AI is analyzing...</span>
                     </div>
                 </div>
             </div>
         </div>
     </template>
 
-    <!-- Error Message Template -->
+    <!-- Professional Error Message Template -->
     <template id="error-template">
-        <div class="chat-message flex gap-3 mb-4">
+        <div class="chat-message flex gap-4 mb-6">
             <div class="flex-shrink-0">
-                <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-red-100 to-pink-100 flex items-center justify-center">
                     <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
             </div>
             <div class="flex-grow">
-                <div class="message-bubble system p-4">
-                    <div class="message-content text-red-700"></div>
-                    <div class="message-meta text-xs opacity-75 mt-2">
-                        <button class="text-red-600 hover:text-red-800 underline retry-btn">Retry</button>
+                <div class="message-bubble system p-4 rounded-xl">
+                    <div class="message-content text-red-700 font-medium"></div>
+                    <div class="message-meta text-xs opacity-75 mt-3">
+                        <button class="text-red-600 hover:text-red-800 underline font-medium retry-btn">Retry</button>
                     </div>
                 </div>
             </div>

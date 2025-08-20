@@ -32,17 +32,6 @@ function showScreen(screenKey) {
     }
 }
 
-function addMessageToChat(message, sender) {
-    const bubble = document.createElement('div');
-    bubble.classList.add('chat-bubble', sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai', 'self-start');
-    if (sender === 'user') {
-        bubble.classList.add('self-end');
-    }
-    bubble.textContent = message;
-    chatWindow.appendChild(bubble);
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-}
-
 // --- WebSocket Functions ---
 function establishWebSocketConnection(sessionId) {
     console.log('🔌 Establishing WebSocket connection for session:', sessionId);
@@ -250,7 +239,7 @@ function displayAIMessage(message) {
 // Enhanced addMessageToChat function (like your LLM code but with better styling)
 function addMessageToChat(message, sender) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'chat-message flex gap-3 mb-4';
+    messageDiv.className = 'chat-message flex gap-4 mb-6';
     
     // Avatar and message alignment (like your LLM code)
     if (sender === 'user') {
@@ -262,21 +251,32 @@ function addMessageToChat(message, sender) {
     // Avatar
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'flex-shrink-0';
-    avatarDiv.innerHTML = `
-        <div class="w-8 h-8 rounded-full ${sender === 'user' ? 'bg-blue-100' : 'bg-purple-100'} flex items-center justify-center">
-            <svg class="w-4 h-4 ${sender === 'user' ? 'text-blue-600' : 'text-purple-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-            </svg>
-        </div>
-    `;
+    
+    if (sender === 'user') {
+        avatarDiv.innerHTML = `
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+            </div>
+        `;
+    } else {
+        avatarDiv.innerHTML = `
+            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                </svg>
+            </div>
+        `;
+    }
     
     // Message bubble
     const messageBubble = document.createElement('div');
     messageBubble.className = 'flex-grow';
     messageBubble.innerHTML = `
-        <div class="message-bubble p-4 ${sender === 'user' ? 'user' : 'ai'}">
-            <div class="message-content">${message}</div>
-            <div class="message-meta text-xs opacity-75 mt-2">${new Date().toLocaleTimeString()}</div>
+        <div class="message-bubble p-4 rounded-xl ${sender === 'user' ? 'user' : 'ai'}">
+            <div class="message-content leading-relaxed">${message}</div>
+            <div class="message-meta text-xs text-gray-500 mt-3 font-mono">${new Date().toLocaleTimeString()}</div>
         </div>
     `;
     
@@ -624,14 +624,14 @@ async function startInterview() {
     // Clear chat window and show welcome message
     const chatWindow = document.getElementById('chat-window');
     chatWindow.innerHTML = `
-        <div class="text-center py-8 text-gray-500">
-            <div class="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+        <div class="text-center py-12 text-gray-600">
+            <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl flex items-center justify-center">
+                <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                 </svg>
             </div>
-            <p class="text-lg font-medium">Your interview is starting...</p>
-            <p class="text-sm">The AI interviewer is preparing your first question</p>
+            <h3 class="text-xl font-semibold text-gray-800 mb-2">Interview Session Initializing</h3>
+            <p class="text-gray-500">Preparing your personalized interview experience...</p>
         </div>
     `;
 
@@ -1030,12 +1030,6 @@ document.getElementById('clear-input-btn')?.addEventListener('click', () => {
     userInput.value = '';
     updateCharacterCount();
     userInput.focus();
-});
-
-// Save draft button (placeholder for future implementation)
-document.getElementById('save-draft-btn')?.addEventListener('click', () => {
-    console.log('💾 Save draft functionality - to be implemented');
-    // Future: Save current input to localStorage or backend
 });
 
 // Handle page refresh/restart
