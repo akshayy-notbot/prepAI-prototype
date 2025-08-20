@@ -49,7 +49,6 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_websockets=True,  # Explicitly allow WebSocket connections
 )
 
 # --- Database Setup ---
@@ -923,6 +922,18 @@ async def test_websocket_endpoint():
         "status": "websocket_ready",
         "message": "WebSocket endpoint is configured and ready",
         "endpoint": "/ws/{session_id}",
+        "cors_origins": origins,
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/websocket-info")
+async def websocket_info():
+    """Get WebSocket connection information"""
+    return {
+        "active_connections": len(active_connections),
+        "websocket_endpoint": "/ws/{session_id}",
+        "cors_enabled": True,
+        "allow_origins": origins,
         "timestamp": datetime.now().isoformat()
     }
 
@@ -967,6 +978,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 
     except Exception as e:
         print(f"❌ WebSocket: Connection error for session {session_id}: {e}")
+        # Try to send error message if possible
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": f"Connection error: {str(e)}",
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            }))
+        except:
+            pass  # Ignore if we can't send error message
         
     finally:
         # Clean up connection
