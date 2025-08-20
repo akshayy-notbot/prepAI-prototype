@@ -160,6 +160,12 @@ function handleWebSocketMessage(message) {
         // Try to parse as JSON first (for structured messages)
         const data = typeof message === 'string' ? JSON.parse(message) : message;
         
+        // Filter out connection and status messages
+        if (data.type === 'connection_status' || data.type === 'status') {
+            console.log('🔌 WebSocket connection message received, ignoring for display');
+            return; // Don't display connection messages
+        }
+        
         if (data.type === 'question') {
             // Structured question message
             handleAIQuestion(data.content || data.message || 'New question received');
@@ -167,21 +173,33 @@ function handleWebSocketMessage(message) {
             // Error message
             console.error('❌ AI Error:', data.message);
             displayErrorMessage(data.message || 'An error occurred');
-        } else if (data.type === 'status') {
-            // Status update
-            updateQuestionStatus(data.message || 'Status update');
         } else if (data.type === 'interview_complete') {
             // Interview completion
             handleInterviewCompletion(data.message || 'Interview completed successfully!');
+        } else if (data.type === 'message_received') {
+            // Echo message from WebSocket test, ignore
+            console.log('📨 Echo message received, ignoring');
+            return;
         } else {
-            // Default: treat as a question
-            handleAIQuestion(data.content || data.message || message);
+            // Check if this looks like an actual question (not a connection message)
+            const messageText = data.content || data.message || message;
+            if (messageText && !messageText.includes('WebSocket connection established') && 
+                !messageText.includes('connection_status') && messageText.length > 20) {
+                // Likely an actual question
+                handleAIQuestion(messageText);
+            } else {
+                console.log('🔌 Filtered out connection/status message:', messageText);
+            }
         }
         
     } catch (error) {
         console.log('📨 Treating message as plain text question');
-        // Treat as plain text question (like your LLM code)
-        handleAIQuestion(message);
+        // Only treat as question if it's not a connection message
+        if (typeof message === 'string' && !message.includes('WebSocket connection established')) {
+            handleAIQuestion(message);
+        } else {
+            console.log('🔌 Filtered out connection message:', message);
+        }
     }
 }
 
@@ -687,6 +705,17 @@ async function startInterview() {
             interviewId = Date.now(); // Generate a simple ID for tracking
             
             console.log('🎯 Interview started with session ID:', sessionId);
+            console.log('🎯 Interview response:', interviewResponse);
+            
+            // Display the first question if it exists in the response
+            if (interviewResponse.first_question) {
+                console.log('🤖 Displaying first question from API response');
+                displayAIMessage(interviewResponse.first_question);
+                updateQuestionStatus('First question received');
+            } else {
+                console.log('⏳ Waiting for first question via WebSocket...');
+                updateQuestionStatus('Waiting for first question...');
+            }
             
             // A. Establish WebSocket Connection
             const wsConnection = establishWebSocketConnection(sessionId);
@@ -700,6 +729,11 @@ async function startInterview() {
             wsConnection.onopen = (event) => {
                 console.log('🔌 WebSocket connection opened successfully');
                 updateQuestionStatus('Connected to AI interviewer');
+                
+                // If we don't have a first question yet, show waiting status
+                if (!interviewResponse.first_question) {
+                    updateQuestionStatus('Waiting for first question...');
+                }
             };
             
             wsConnection.onclose = (event) => {
@@ -721,8 +755,14 @@ async function startInterview() {
             };
             
             // Show typing indicator while waiting for first question
-            showInputLoadingState('typing');
-            updateQuestionStatus('AI is preparing your first question...');
+            if (!interviewResponse.first_question) {
+                showInputLoadingState('typing');
+                updateQuestionStatus('AI is preparing your first question...');
+            } else {
+                // First question already received, enable input
+                enableChatInput();
+                updateQuestionStatus('Ready for your answer');
+            }
             
         } else {
             throw new Error('Failed to start interview - no session ID received');
@@ -1034,7 +1074,11 @@ async function handleSubmitAnswer() {
 
     // 4. Send the answer to the backend via HTTP POST (clean approach)
     try {
-        const response = await fetch('/api/submit-answer', {
+        const submitUrl = `${BACKEND_URL}/api/submit-answer`;
+        console.log('🚀 Submitting answer to:', submitUrl);
+        console.log('🚀 Submit data:', { session_id: sessionId, answer: answerText });
+        
+        const response = await fetch(submitUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1045,9 +1089,13 @@ async function handleSubmitAnswer() {
             }),
         });
 
+        console.log('📨 Submit response status:', response.status);
+        console.log('📨 Submit response headers:', response.headers);
+        
         if (response.status !== 202) {
             // Handle error if the server didn't accept the request
-            console.error("Failed to submit answer.");
+            const errorText = await response.text();
+            console.error("Failed to submit answer. Status:", response.status, "Response:", errorText);
             addMessageToChat("Error: Could not submit answer.", 'system');
             // Re-enable input on error
             userInput.disabled = false;
@@ -1055,6 +1103,8 @@ async function handleSubmitAnswer() {
             hideInputLoadingStates();
         } else {
             // Success feedback (brief visual confirmation)
+            const responseData = await response.json();
+            console.log('✅ Answer submitted successfully:', responseData);
             showInputLoadingState('success');
             updateQuestionStatus('Answer submitted - waiting for AI response...');
             
