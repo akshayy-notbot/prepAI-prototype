@@ -32,6 +32,18 @@ function showScreen(screenKey) {
     }
 }
 
+// --- Configuration ---
+// Use configuration from config.js with fallback
+const BACKEND_URL = window.PREPAI_CONFIG?.API_BASE_URL || 'https://prepai-api.onrender.com';
+const WS_BASE_URL = window.PREPAI_CONFIG?.WS_BASE_URL || 'wss://prepai-api.onrender.com';
+
+// Log configuration for debugging
+console.log('🔧 Configuration loaded:', {
+    BACKEND_URL,
+    WS_BASE_URL,
+    PREPAI_CONFIG: window.PREPAI_CONFIG
+});
+
 // --- WebSocket Functions ---
 function establishWebSocketConnection(sessionId) {
     console.log('🔌 Establishing WebSocket connection for session:', sessionId);
@@ -41,9 +53,8 @@ function establishWebSocketConnection(sessionId) {
         websocket.close();
     }
     
-    // Determine the correct WebSocket protocol
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
+    // Use the configured WebSocket URL
+    const wsUrl = `${WS_BASE_URL}/ws/${sessionId}`;
     
     console.log('🔌 Connecting to WebSocket URL:', wsUrl);
     
@@ -627,7 +638,7 @@ async function startInterview() {
         <div class="text-center py-12 text-gray-600">
             <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl flex items-center justify-center">
                 <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8s9 3.582 9 8-9-8-9-8z"></path>
                 </svg>
             </div>
             <h3 class="text-xl font-semibold text-gray-800 mb-2">Interview Session Initializing</h3>
@@ -753,7 +764,7 @@ async function generateQuestionsWithGemini() {
 }
 
 async function startOrchestratorInterview() {
-    const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
+    const API_BASE_URL = BACKEND_URL;
     
     try {
         console.log('🚀 Starting orchestrator interview with config:', interviewConfig);
@@ -831,7 +842,7 @@ async function endInterview() {
     showScreen('analysis');
 
     // Use the live Render backend URL
-    const API_BASE_URL = "https://prepai-api.onrender.com"; 
+    const API_BASE_URL = BACKEND_URL; 
     
     try {
         const response = await fetch(`${API_BASE_URL}/api/interviews/${interviewId}/complete`, {
