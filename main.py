@@ -9,6 +9,7 @@ load_dotenv()
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -24,8 +25,8 @@ from agents.persona import generate_ai_question
 # Import Celery tasks from celery_app
 from celery_app import my_test_task, orchestrate_next_turn
 
-# HTTP polling connection manager (WebSocket alternative for Render)
-active_polling_sessions: list[str] = []
+# WebSocket connection manager
+active_connections: list[WebSocket] = []
 
 # --- FastAPI App Initialization ---
 app = FastAPI()
@@ -34,6 +35,7 @@ app = FastAPI()
 # This allows your frontend to communicate with your backend
 origins = [
     "https://akshayy-notbot.github.io",  # Your live GitHub Pages site
+    "https://prepai-api.onrender.com",   # Your Render backend
     "http://127.0.0.1:5500",            # For local testing with VS Code Live Server
     "http://localhost:8000",
     "http://127.0.0.1:8000",            # Local backend
@@ -47,11 +49,22 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_websockets=True,  # Explicitly allow WebSocket connections
 )
 
 # --- Database Setup ---
 # This line creates the database tables if they don't exist when the app starts
 models.create_tables()
+
+# --- Health Check Endpoint ---
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Render deployment"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now().isoformat(),
+        "service": "PrepAI Backend"
+    }
 
 # --- Startup Event Handler ---
 @app.on_event("startup")
@@ -903,46 +916,63 @@ def test_celery_task():
         "status": "Task queued successfully"
     }
 
-@app.get("/api/interview-status/{session_id}")
-def get_interview_status(session_id: str, db: Session = Depends(get_db)):
-    """Get the current status of an interview session"""
-    try:
-        # Find the interview session
-        session = db.query(models.InterviewSession).filter(
-            models.InterviewSession.session_id == session_id
-        ).first()
-        
-        if not session:
-            raise HTTPException(status_code=404, detail="Interview session not found")
-        
-        # Check if there are any pending questions or if AI is processing
-        if session.status == 'in-progress':
-            # For now, return a simple status
-            # In a real implementation, you'd check the actual question queue
-            return {
-                "status": "processing",
-                "session_id": session_id,
-                "message": "AI is preparing your next question"
-            }
-        elif session.status == 'completed':
-            return {
-                "status": "complete",
-                "session_id": session_id,
-                "message": "Interview completed"
-            }
-        else:
-            return {
-                "status": "unknown",
-                "session_id": session_id,
-                "message": "Unknown status"
-            }
-            
-    except Exception as e:
-        print(f"Error getting interview status: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get interview status: {str(e)}")
+@app.get("/test-websocket")
+async def test_websocket_endpoint():
+    """Test endpoint to verify WebSocket configuration"""
+    return {
+        "status": "websocket_ready",
+        "message": "WebSocket endpoint is configured and ready",
+        "endpoint": "/ws/{session_id}",
+        "timestamp": datetime.now().isoformat()
+    }
 
-# WebSocket endpoint removed - not supported on Render
-# Using HTTP polling instead for real-time updates
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for real-time communication with interview sessions"""
+    try:
+        # Accept the WebSocket connection
+        await websocket.accept()
+        
+        # Add to active connections
+        active_connections.append(websocket)
+        print(f"✅ WebSocket: Session {session_id} connected successfully")
+        
+        # Send a welcome message
+        await websocket.send_text(json.dumps({
+            "type": "connection_status",
+            "message": "WebSocket connection established",
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        }))
+        
+        # Keep connection alive and handle messages
+        while True:
+            try:
+                # Receive message from client
+                data = await websocket.receive_text()
+                print(f"📨 WebSocket: Message from session {session_id}: {data}")
+                
+                # Echo back the message (for testing)
+                response = {
+                    "type": "message_received",
+                    "message": f"Message received: {data}",
+                    "session_id": session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+                await websocket.send_text(json.dumps(response))
+                
+            except Exception as e:
+                print(f"❌ WebSocket: Error handling message from session {session_id}: {e}")
+                break
+                
+    except Exception as e:
+        print(f"❌ WebSocket: Connection error for session {session_id}: {e}")
+        
+    finally:
+        # Clean up connection
+        if websocket in active_connections:
+            active_connections.remove(websocket)
+        print(f"🔌 WebSocket: Session {session_id} disconnected")
 
 @app.get("/test-redis")
 def test_redis():
