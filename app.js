@@ -5,7 +5,7 @@ let questions = [];
 let currentQuestionIndex = 0;
 let transcript = [];
 let interviewConfig = {}; // To store user selections
-let pollingInterval = null; // HTTP polling interval for real-time updates
+let websocket = null; // WebSocket connection for real-time communication
 let isWaitingForAI = false; // Track if we're waiting for AI response
 
 // --- Screen & Element References ---
@@ -23,7 +23,6 @@ const chatInput = document.getElementById('chat-input');
 const chatWindow = document.getElementById('chat-window');
 const feedbackOutput = document.getElementById('feedback-output');
 const sendBtn = document.getElementById('send-btn');
-const userInput = chatInput; // Alias for compatibility
 
 // --- Helper Functions ---
 function showScreen(screenKey) {
@@ -44,70 +43,33 @@ function addMessageToChat(message, sender) {
     chatWindow.scrollTop = chatWindow.scrollHeight;
 }
 
-// --- HTTP Polling Functions (WebSocket Alternative for Render) ---
-function establishConnection(sessionId) {
-    console.log('🔌 Establishing HTTP polling connection for session:', sessionId);
+// --- WebSocket Functions ---
+function establishWebSocketConnection(sessionId) {
+    console.log('🔌 Establishing WebSocket connection for session:', sessionId);
     
-    // Clear any existing polling
-    if (pollingInterval) {
-        clearInterval(pollingInterval);
+    // Close existing connection if any
+    if (websocket) {
+        websocket.close();
     }
     
-    // Start polling for updates every 1 second (optimized for responsiveness)
-    pollingInterval = setInterval(() => {
-        checkForUpdates(sessionId);
-    }, 1000);
+    // Determine the correct WebSocket protocol
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/${sessionId}`;
     
-    console.log('✅ HTTP polling connection established');
-    updateQuestionStatus('Connected to AI interviewer');
+    console.log('🔌 Connecting to WebSocket URL:', wsUrl);
     
-    // Note: First question display is handled in startInterview function
-    // Only show loading if no question was provided initially
+    // Create real WebSocket connection
+    websocket = new WebSocket(wsUrl);
+    
+    console.log('✅ WebSocket connection created');
+    return websocket;
 }
 
-// Check for updates via HTTP polling
-async function checkForUpdates(sessionId) {
-    try {
-        const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
-        const response = await fetch(`${API_BASE_URL}/api/interview-status/${sessionId}`);
-        console.log('🔍 Polling for updates:', `${API_BASE_URL}/api/interview-status/${sessionId}`);
-        if (response.ok) {
-            const data = await response.json();
-            console.log('📊 Polling response:', data);
-            handleInterviewUpdate(data);
-        } else {
-            console.log('⚠️ Polling response not OK:', response.status, response.statusText);
-        }
-    } catch (error) {
-        console.error('❌ Error checking for updates:', error);
-        // Don't show error to user for polling failures
-    }
-}
-
-// Handle interview updates from polling
-function handleInterviewUpdate(data) {
-    if (data.status === 'question_ready' && data.question) {
-        // New question is ready
-        handleAIQuestion(data.question);
-        hideInputLoadingState();
-        updateQuestionStatus('Question ready');
-    } else if (data.status === 'processing') {
-        // AI is still processing
-        showInputLoadingState('typing');
-        updateQuestionStatus('AI is thinking...');
-    } else if (data.status === 'complete') {
-        // Interview is complete
-        endInterview();
-    }
-}
-
-// Clean up connection
-function cleanupConnection() {
-    if (pollingInterval) {
-        clearInterval(pollingInterval);
-        pollingInterval = null;
-    }
-    updateQuestionStatus('Ready');
+// WebSocket message checking (simplified for real WebSocket)
+async function checkForNewMessages(sessionId) {
+    // This function is kept for compatibility but not needed with real WebSockets
+    // The WebSocket onmessage handler will receive messages automatically
+    console.log('🔍 WebSocket message checking not needed with real WebSocket connection');
 }
 
 function updateCharacterCount() {
@@ -152,20 +114,42 @@ function updateProgressBar(questionsAnswered, totalQuestions) {
 }
 
 // Cleanup function for WebSocket connections
-// HTTP polling message handler (WebSocket alternative)
-function handlePollingMessage(data) {
-    console.log('📨 Received polling update:', data);
+function cleanupWebSocket() {
+    if (websocket) {
+        websocket.close();
+        websocket = null;
+    }
+}
+
+function handleWebSocketMessage(message) {
+    console.log('📨 Received WebSocket message:', message);
     
-    if (data.status === 'question_ready' && data.question) {
-        // New question is ready
-        handleAIQuestion(data.question);
-    } else if (data.status === 'processing') {
-        // AI is still processing
-        showInputLoadingState('typing');
-        updateQuestionStatus('AI is thinking...');
-    } else if (data.status === 'complete') {
-        // Interview is complete
-        handleInterviewCompletion(data.message || 'Interview completed successfully!');
+    try {
+        // Try to parse as JSON first (for structured messages)
+        const data = typeof message === 'string' ? JSON.parse(message) : message;
+        
+        if (data.type === 'question') {
+            // Structured question message
+            handleAIQuestion(data.content || data.message || 'New question received');
+        } else if (data.type === 'error') {
+            // Error message
+            console.error('❌ AI Error:', data.message);
+            displayErrorMessage(data.message || 'An error occurred');
+        } else if (data.type === 'status') {
+            // Status update
+            updateQuestionStatus(data.message || 'Status update');
+        } else if (data.type === 'interview_complete') {
+            // Interview completion
+            handleInterviewCompletion(data.message || 'Interview completed successfully!');
+        } else {
+            // Default: treat as a question
+            handleAIQuestion(data.content || data.message || message);
+        }
+        
+    } catch (error) {
+        console.log('📨 Treating message as plain text question');
+        // Treat as plain text question (like your LLM code)
+        handleAIQuestion(message);
     }
 }
 
@@ -375,11 +359,6 @@ function hideInputLoadingStates() {
     if (typingIndicator) typingIndicator.classList.add('hidden');
     if (processingIndicator) processingIndicator.classList.add('hidden');
     if (successIndicator) successIndicator.classList.add('hidden');
-}
-
-function hideInputLoadingState() {
-    // Hide all loading states (alias for compatibility)
-    hideInputLoadingStates();
 }
 
 function showInputLoadingState(type) {
@@ -626,10 +605,10 @@ document.getElementById('go-to-interview-prep-btn').addEventListener('click', ()
 document.getElementById('start-interview-btn').addEventListener('click', startInterview);
 
 // --- Core API Interaction Logic ---
-// NEW ASYNCHRONOUS FLOW WITH HTTP POLLING (Render Compatible):
-// 1. startInterview() -> calls /api/start-interview -> establishes HTTP polling
+// NEW ASYNCHRONOUS FLOW WITH ORCHESTRATOR:
+// 1. startInterview() -> calls /api/start-interview -> establishes WebSocket
 // 2. handleSubmitAnswer() -> calls /api/submit-answer (returns 202 immediately)
-// 3. HTTP polling checks for updates -> handlePollingMessage() -> displays question
+// 3. WebSocket receives AI question -> handleWebSocketMessage() -> displays question
 // 4. Repeat steps 2-3 until interview complete
 // 5. endInterview() -> calls /api/interviews/{id}/complete -> shows analysis
 
@@ -666,20 +645,41 @@ async function startInterview() {
             
             console.log('🎯 Interview started with session ID:', sessionId);
             
-            // Display the first question immediately if available
-            if (interviewResponse.first_question) {
-                console.log('📝 Displaying first question:', interviewResponse.first_question);
-                handleAIQuestion(interviewResponse.first_question);
-                hideQuestionLoading();
-                updateQuestionStatus('Question ready');
-            } else {
-                // If no first question, show loading and start polling
-                showInputLoadingState('typing');
-                updateQuestionStatus('AI is preparing your first question...');
-            }
+            // A. Establish WebSocket Connection
+            const wsConnection = establishWebSocketConnection(sessionId);
             
-            // A. Establish HTTP Polling Connection (WebSocket alternative for Render)
-            establishConnection(sessionId);
+            // B. Set up message handling (real WebSocket)
+            wsConnection.onmessage = (event) => {
+                console.log('📨 Raw WebSocket message received:', event.data);
+                handleWebSocketMessage(event.data);
+            };
+            
+            wsConnection.onopen = (event) => {
+                console.log('🔌 WebSocket connection opened successfully');
+                updateQuestionStatus('Connected to AI interviewer');
+            };
+            
+            wsConnection.onclose = (event) => {
+                console.log('🔌 WebSocket connection closed:', event);
+                updateQuestionStatus('Connection lost - reconnecting...');
+                
+                // Simple reconnection logic (like your LLM code)
+                if (event.code !== 1000) { // Not a normal closure
+                    setTimeout(() => {
+                        console.log('🔄 Attempting to reconnect...');
+                        establishWebSocketConnection(sessionId);
+                    }, 3000); // Wait 3 seconds before reconnecting
+                }
+            };
+            
+            wsConnection.onerror = (error) => {
+                console.error('❌ WebSocket error:', error);
+                updateQuestionStatus('Connection error - please refresh');
+            };
+            
+            // Show typing indicator while waiting for first question
+            showInputLoadingState('typing');
+            updateQuestionStatus('AI is preparing your first question...');
             
         } else {
             throw new Error('Failed to start interview - no session ID received');
@@ -828,9 +828,6 @@ async function endInterview() {
     // Stop the timer
     stopTimer();
     
-    // Clean up the HTTP polling connection
-    cleanupConnection();
-    
     showScreen('analysis');
 
     // Use the live Render backend URL
@@ -943,6 +940,7 @@ async function endInterview() {
 // --- Event Listeners ---
 // Clean event listener setup (like LLM code)
 const submitButton = sendBtn; // Use existing reference
+const userInput = chatInput; // Use existing reference
 
 submitButton.addEventListener('click', handleSubmitAnswer);
 userInput.addEventListener('keypress', (e) => {
@@ -979,16 +977,10 @@ async function handleSubmitAnswer() {
 
     // 4. Send the answer to the backend via HTTP POST (clean approach)
     try {
-        const API_BASE_URL = "https://prepai-api.onrender.com"; // Live Render backend
-        console.log('🔗 Using API URL:', API_BASE_URL);
-        console.log('🔗 Full submit-answer URL:', `${API_BASE_URL}/api/submit-answer`);
-        console.log('🔗 Session ID:', sessionId);
-        console.log('🔗 Answer text:', answerText);
-        const response = await fetch(`${API_BASE_URL}/api/submit-answer`, {
+        const response = await fetch('/api/submit-answer', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Cache-Control': 'no-cache',
             },
             body: JSON.stringify({
                 session_id: sessionId,
@@ -1017,7 +1009,7 @@ async function handleSubmitAnswer() {
         }
         
         // NOTE: We don't need to do anything else with the successful response.
-        // The HTTP polling will check for updates and handle the next question.
+        // The WebSocket 'onmessage' handler is now responsible for handling the next question.
 
     } catch (error) {
         console.error("Error submitting answer:", error);
@@ -1049,7 +1041,7 @@ document.getElementById('save-draft-btn')?.addEventListener('click', () => {
 // Handle page refresh/restart
 function restart() {
     stopTimer();
-    cleanupConnection();
+    cleanupWebSocket();
     location.reload();
 }
 
