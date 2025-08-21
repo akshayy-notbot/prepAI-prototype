@@ -956,24 +956,66 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             "timestamp": datetime.now().isoformat()
         }))
         
-        # Keep connection alive and handle messages
+        # Set up Redis pub/sub for this session
+        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        redis_client = redis.from_url(redis_url)
+        pubsub = redis_client.pubsub()
+        
+        # Subscribe to the session-specific channel
+        channel_name = f"channel:{session_id}"
+        pubsub.subscribe(channel_name)
+        print(f"🔌 WebSocket: Subscribed to Redis channel {channel_name}")
+        
+        # Send initial status
+        await websocket.send_text(json.dumps({
+            "type": "status",
+            "message": f"Listening for AI responses on channel {channel_name}",
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        }))
+        
+        # Keep connection alive and handle messages from both client and Redis
         while True:
             try:
-                # Receive message from client
-                data = await websocket.receive_text()
-                print(f"📨 WebSocket: Message from session {session_id}: {data}")
+                # Check for Redis messages (non-blocking)
+                redis_message = pubsub.get_message(timeout=0.1)
+                if redis_message and redis_message['type'] == 'message':
+                    # This is a message from the Celery task (AI response)
+                    ai_question = redis_message['data'].decode('utf-8')
+                    print(f"🤖 WebSocket: AI question received from Redis for session {session_id}: {ai_question[:100]}...")
+                    
+                    # Send the AI question to the client
+                    await websocket.send_text(json.dumps({
+                        "type": "question",
+                        "content": ai_question,
+                        "session_id": session_id,
+                        "timestamp": datetime.now().isoformat()
+                    }))
+                    continue
                 
-                # Echo back the message (for testing)
-                response = {
-                    "type": "message_received",
-                    "message": f"Message received: {data}",
-                    "session_id": session_id,
-                    "timestamp": datetime.now().isoformat()
-                }
-                await websocket.send_text(json.dumps(response))
+                # Check for client messages (non-blocking)
+                try:
+                    data = await websocket.receive_text()
+                    print(f"📨 WebSocket: Message from session {session_id}: {data}")
+                    
+                    # Echo back the message (for testing)
+                    response = {
+                        "type": "message_received",
+                        "message": f"Message received: {data}",
+                        "session_id": session_id,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    await websocket.send_text(json.dumps(response))
+                    
+                except Exception as e:
+                    # No message from client, continue checking Redis
+                    if "timeout" not in str(e).lower():
+                        print(f"❌ WebSocket: Error handling message from session {session_id}: {e}")
+                        break
+                    continue
                 
             except Exception as e:
-                print(f"❌ WebSocket: Error handling message from session {session_id}: {e}")
+                print(f"❌ WebSocket: Error in main loop for session {session_id}: {e}")
                 break
                 
     except Exception as e:
@@ -990,7 +1032,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             pass  # Ignore if we can't send error message
         
     finally:
-        # Clean up connection
+        # Clean up connection and Redis subscription
+        try:
+            if 'pubsub' in locals():
+                pubsub.unsubscribe(channel_name)
+                pubsub.close()
+                print(f"🔌 WebSocket: Redis subscription closed for session {session_id}")
+        except Exception as e:
+            print(f"⚠️ WebSocket: Error closing Redis subscription for session {session_id}: {e}")
+            
         if websocket in active_connections:
             active_connections.remove(websocket)
         print(f"🔌 WebSocket: Session {session_id} disconnected")
@@ -1063,3 +1113,81 @@ def test_redis():
     except Exception as e:
         print(f"❌ Redis test error: {e}")
         return {"status": "error", "message": f"Redis test failed: {str(e)}"}
+
+@app.get("/api/task-status/{task_id}")
+def get_task_status(task_id: str):
+    """Get the status of a Celery task"""
+    try:
+        # Get Redis URL from environment
+        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        r = redis.from_url(redis_url)
+        
+        # Check for task metadata
+        task_key = f"celery-task-meta-{task_id}"
+        task_data = r.get(task_key)
+        
+        if task_data:
+            task_info = json.loads(task_data)
+            return {
+                "task_id": task_id,
+                "status": task_info.get("status", "unknown"),
+                "result": task_info.get("result", None),
+                "traceback": task_info.get("traceback", None),
+                "timestamp": datetime.now().isoformat()
+            }
+        else:
+            return {
+                "task_id": task_id,
+                "status": "not_found",
+                "message": "Task metadata not found in Redis",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+    except Exception as e:
+        return {
+            "task_id": task_id,
+            "status": "error",
+            "message": f"Error checking task status: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.get("/api/celery-status")
+def get_celery_status():
+    """Get general Celery and Redis status"""
+    try:
+        # Get Redis URL from environment
+        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        r = redis.from_url(redis_url)
+        
+        # Check Redis connection
+        r.ping()
+        redis_status = "connected"
+        
+        # Check for active tasks
+        task_keys = r.keys("celery-task-meta-*")
+        active_tasks = len(task_keys)
+        
+        # Check for pending tasks
+        pending_keys = r.keys("celery:*")
+        pending_tasks = len(pending_keys)
+        
+        return {
+            "status": "healthy",
+            "redis": {
+                "status": redis_status,
+                "url": redis_url
+            },
+            "celery": {
+                "active_tasks": active_tasks,
+                "pending_tasks": pending_tasks,
+                "total_tasks": active_tasks + pending_tasks
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Status check failed: {str(e)}",
+            "timestamp": datetime.now().isoformat()
+        }
