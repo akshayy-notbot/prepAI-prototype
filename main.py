@@ -2,6 +2,7 @@ import os
 import json
 from typing import List, Dict, Any
 from datetime import datetime
+import time
 
 # Load environment variables from .env file if it exists
 from dotenv import load_dotenv
@@ -958,13 +959,40 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         
         # Set up Redis pub/sub for this session
         redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-        redis_client = redis.from_url(redis_url)
-        pubsub = redis_client.pubsub()
+        print(f"🔌 WebSocket: Attempting Redis connection to {redis_url}")
         
-        # Subscribe to the session-specific channel
-        channel_name = f"channel:{session_id}"
-        pubsub.subscribe(channel_name)
-        print(f"🔌 WebSocket: Subscribed to Redis channel {channel_name}")
+        try:
+            redis_client = redis.from_url(redis_url)
+            # Test Redis connection
+            redis_client.ping()
+            print(f"✅ WebSocket: Redis connection successful")
+            
+            pubsub = redis_client.pubsub()
+            
+            # Subscribe to the session-specific channel
+            channel_name = f"channel:{session_id}"
+            pubsub.subscribe(channel_name)
+            print(f"🔌 WebSocket: Subscribed to Redis channel {channel_name}")
+            
+            # Test subscription by checking if we're actually subscribed
+            channels = pubsub.channels
+            if channel_name.encode() in channels:
+                print(f"✅ WebSocket: Redis subscription confirmed for channel {channel_name}")
+            else:
+                print(f"❌ WebSocket: Redis subscription failed for channel {channel_name}")
+                print(f"   Available channels: {channels}")
+                raise Exception("Redis subscription failed")
+                
+        except Exception as e:
+            print(f"❌ WebSocket: Redis connection/subscription error: {e}")
+            # Send error to client
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "message": f"Redis connection failed: {str(e)}",
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            }))
+            raise e
         
         # Send initial status
         await websocket.send_text(json.dumps({
@@ -975,23 +1003,54 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         }))
         
         # Keep connection alive and handle messages from both client and Redis
+        last_redis_check = time.time()
         while True:
             try:
+                # Periodic Redis health check (every 10 seconds)
+                current_time = time.time()
+                if current_time - last_redis_check > 10:
+                    try:
+                        redis_client.ping()
+                        print(f"✅ WebSocket: Redis health check passed for session {session_id}")
+                        last_redis_check = current_time
+                    except Exception as health_error:
+                        print(f"❌ WebSocket: Redis health check failed for session {session_id}: {health_error}")
+                        # Try to reconnect
+                        try:
+                            redis_client = redis.from_url(redis_url)
+                            redis_client.ping()
+                            pubsub = redis_client.pubsub()
+                            pubsub.subscribe(channel_name)
+                            print(f"✅ WebSocket: Redis reconnection successful for session {session_id}")
+                            last_redis_check = current_time
+                        except Exception as reconnect_error:
+                            print(f"❌ WebSocket: Redis reconnection failed for session {session_id}: {reconnect_error}")
+                            break
+                
                 # Check for Redis messages (non-blocking)
-                redis_message = pubsub.get_message(timeout=0.1)
-                if redis_message and redis_message['type'] == 'message':
-                    # This is a message from the Celery task (AI response)
-                    ai_question = redis_message['data'].decode('utf-8')
-                    print(f"🤖 WebSocket: AI question received from Redis for session {session_id}: {ai_question[:100]}...")
-                    
-                    # Send the AI question to the client
-                    await websocket.send_text(json.dumps({
-                        "type": "question",
-                        "content": ai_question,
-                        "session_id": session_id,
-                        "timestamp": datetime.now().isoformat()
-                    }))
-                    continue
+                try:
+                    redis_message = pubsub.get_message(timeout=0.1)
+                    if redis_message and redis_message['type'] == 'message':
+                        # This is a message from the Celery task (AI response)
+                        ai_question = redis_message['data'].decode('utf-8')
+                        print(f"🤖 WebSocket: AI question received from Redis for session {session_id}: {ai_question[:100]}...")
+                        
+                        # Send the AI question to the client
+                        await websocket.send_text(json.dumps({
+                            "type": "question",
+                            "content": ai_question,
+                            "session_id": session_id,
+                            "timestamp": datetime.now().isoformat()
+                        }))
+                        continue
+                    elif redis_message and redis_message['type'] == 'subscribe':
+                        print(f"🔌 WebSocket: Redis subscription message: {redis_message}")
+                    elif redis_message:
+                        print(f"🔌 WebSocket: Other Redis message: {redis_message}")
+                        
+                except Exception as redis_error:
+                    print(f"❌ WebSocket: Redis message handling error: {redis_error}")
+                    # Continue trying to handle client messages
                 
                 # Check for client messages (non-blocking)
                 try:
