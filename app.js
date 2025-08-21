@@ -104,46 +104,9 @@ async function checkForNewMessages(sessionId) {
     console.log('🔍 WebSocket message checking not needed with real WebSocket connection');
 }
 
-function updateCharacterCount() {
-    const charCountElement = document.getElementById('char-count');
-    if (charCountElement) {
-        const count = userInput.value.length;
-        charCountElement.textContent = count;
-        
-        // Add visual feedback for character limit
-        if (count > 1800) {
-            charCountElement.classList.add('text-red-500', 'font-semibold');
-        } else if (count > 1500) {
-            charCountElement.classList.add('text-yellow-500', 'font-semibold');
-            charCountElement.classList.remove('text-red-500');
-        } else {
-            charCountElement.classList.remove('text-red-500', 'text-yellow-500', 'font-semibold');
-        }
-    }
-}
 
-// Update progress bar and counters
-function updateProgressBar(questionsAnswered, totalQuestions) {
-    const progressBar = document.getElementById('progress-bar');
-    const progressText = document.getElementById('progress-text');
-    const questionsAnsweredElement = document.getElementById('questions-answered');
-    const totalQuestionsElement = document.getElementById('total-questions');
-    
-    if (progressBar && progressText && questionsAnsweredElement && totalQuestionsElement) {
-        const percentage = totalQuestions > 0 ? (questionsAnswered / totalQuestions) * 100 : 0;
-        
-        progressBar.style.width = `${percentage}%`;
-        progressText.textContent = `${Math.round(percentage)}% Complete`;
-        questionsAnsweredElement.textContent = questionsAnswered;
-        totalQuestionsElement.textContent = totalQuestions;
-        
-        // Add animation class when progress changes
-        progressBar.classList.add('progress-bar-animated');
-        setTimeout(() => {
-            progressBar.classList.remove('progress-bar-animated');
-        }, 2000);
-    }
-}
+
+
 
 // Cleanup function for WebSocket connections
 function cleanupWebSocket() {
@@ -220,8 +183,7 @@ function handleAIQuestion(questionText) {
     // Update status
     updateQuestionStatus('Question received');
     
-    // Update progress
-    updateProgressBar(transcript.length, transcript.length + 1);
+
 }
 
 function handleInterviewCompletion(message) {
@@ -236,8 +198,7 @@ function handleInterviewCompletion(message) {
     // Update status
     updateQuestionStatus('Interview complete');
     
-    // Update progress to 100%
-    updateProgressBar(transcript.length, transcript.length);
+
     
     // Show completion message
     setTimeout(() => {
@@ -1129,15 +1090,7 @@ async function handleSubmitAnswer() {
     }
 }
 
-// Character counter functionality
-userInput.addEventListener('input', updateCharacterCount);
 
-// Clear input button
-document.getElementById('clear-input-btn')?.addEventListener('click', () => {
-    userInput.value = '';
-    updateCharacterCount();
-    userInput.focus();
-});
 
 // Handle page refresh/restart
 function restart() {
