@@ -6,9 +6,10 @@ Tests the Redis subscription fix
 
 import redis
 import time
+import os
 
-# Redis connection (use your Render Redis URL)
-redis_url = "redis://red-d2ibkjbipnbc73bjnab0:6379/"
+# Redis connection (use environment variable)
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
 
 print("🔧 Testing Redis Subscription Fix")
 print("=" * 40)
@@ -16,6 +17,11 @@ print("=" * 40)
 try:
     # Connect to Redis
     print("🔌 Connecting to Redis...")
+    print(f"🔍 Redis URL: {redis_url}")
+    
+    if not redis_url or redis_url == "redis://localhost:6379/0":
+        print("⚠️  Using fallback Redis URL - check REDIS_URL environment variable")
+    
     r = redis.from_url(redis_url)
     r.ping()
     print("✅ Redis connection successful")

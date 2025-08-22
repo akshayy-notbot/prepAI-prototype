@@ -93,7 +93,24 @@ function establishWebSocketConnection(sessionId) {
     // Create real WebSocket connection
     websocket = new WebSocket(wsUrl);
     
-    console.log('✅ WebSocket connection created');
+    // Add comprehensive error handling
+    websocket.onopen = function(event) {
+        console.log('✅ WebSocket connection opened successfully');
+    };
+    
+    websocket.onerror = function(error) {
+        console.error('❌ WebSocket error:', error);
+        displayErrorMessage('WebSocket connection error. Please refresh the page.');
+    };
+    
+    websocket.onclose = function(event) {
+        console.log('🔌 WebSocket connection closed:', event.code, event.reason);
+        if (event.code !== 1000) { // Not a normal closure
+            displayErrorMessage('Connection lost. Please refresh the page to reconnect.');
+        }
+    };
+    
+    console.log('✅ WebSocket connection created with error handling');
     return websocket;
 }
 

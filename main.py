@@ -1033,6 +1033,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                             last_redis_check = current_time
                         except Exception as reconnect_error:
                             print(f"❌ WebSocket: Redis reconnection failed for session {session_id}: {reconnect_error}")
+                            # Send error to client before breaking
+                            try:
+                                await websocket.send_text(json.dumps({
+                                    "type": "error",
+                                    "message": f"Redis connection lost: {str(reconnect_error)}",
+                                    "session_id": session_id,
+                                    "timestamp": datetime.now().isoformat()
+                                }))
+                            except:
+                                pass
                             break
                 
                 # Check for Redis messages (non-blocking)

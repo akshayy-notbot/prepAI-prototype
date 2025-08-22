@@ -33,8 +33,10 @@ function getCurrentConfig() {
         return CONFIG.development;
     } else if (hostname.includes('github.io')) {
         return CONFIG.githubPages;
-    } else {
+    } else if (hostname.includes('onrender.com') || hostname.includes('github.io') || hostname.includes('prepai')) {
         return CONFIG.production;
+    } else {
+        return CONFIG.production; // Default to production for safety
     }
 }
 
