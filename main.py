@@ -559,7 +559,7 @@ async def submit_answer(request: SubmitAnswerRequest):
         evaluation_result = evaluate_answer(
             answer=request.answer,
             question=last_question,
-            skills=skills_to_assess
+            skills_to_assess=skills_to_assess
         )
         
         if not evaluation_result:
