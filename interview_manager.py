@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 import os
 import json
 import google.generativeai as genai
-from .utils import get_gemini_client
+from agents.utils import get_gemini_client
 
 def create_interview_plan_with_ai(role: str, seniority: str, skills: List[str]) -> Dict[str, Any]:
     """

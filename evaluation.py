@@ -2,7 +2,7 @@ import os
 import json
 import google.generativeai as genai
 from typing import List, Dict, Any
-from .utils import get_gemini_client
+from agents.utils import get_gemini_client
 
 def evaluate_answer(answer: str, question: str, skills_to_assess: List[str]) -> Dict[str, Any]:
     """

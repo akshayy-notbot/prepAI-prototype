@@ -5,7 +5,7 @@ import google.generativeai as genai
 from typing import List, Dict, Any, Optional, Tuple
 import redis
 from datetime import datetime
-from .utils import get_gemini_client, get_redis_client
+from agents.utils import get_gemini_client, get_redis_client
 
 # --- NEW ARCHITECTURE: Two-Prompt System ---
 
