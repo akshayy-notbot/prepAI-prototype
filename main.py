@@ -165,8 +165,8 @@ def health_check():
     """Health check endpoint for Render"""
     try:
         # Test database connection
-        from models import engine
-        with engine.connect() as conn:
+        from models import get_engine
+        with get_engine().connect() as conn:
             result = conn.execute(text("SELECT 1"))
             result.fetchone()
         

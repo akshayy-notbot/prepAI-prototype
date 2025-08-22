@@ -11,6 +11,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable is required. Please set it in Render dashboard.")
 
+# Create the declarative base for SQLAlchemy models
+Base = declarative_base()
+
 # Lazy initialization - only create engine when needed
 def get_engine():
     """Get database engine (lazy initialization)"""

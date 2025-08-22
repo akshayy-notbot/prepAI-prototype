@@ -11,7 +11,7 @@ from datetime import datetime
 # Add the current directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from models import engine, Base, SessionLocal, Interview, Question
+from models import get_engine, Base, get_session_local, Interview, Question
 
 def migrate_database():
     """Migrate database to new enhanced schema"""
@@ -22,11 +22,11 @@ def migrate_database():
     try:
         # Create all new tables
         print("📋 Creating new database tables...")
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=get_engine())
         print("✅ All tables created successfully")
         
         # Test database connection
-        db = SessionLocal()
+        db = get_session_local()()
         print("🔌 Database connection test successful")
         
         # Check existing data

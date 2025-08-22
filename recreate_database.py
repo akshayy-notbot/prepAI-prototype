@@ -35,7 +35,7 @@ def recreate_database():
         
         # Verify table creation
         print("\n📋 Verifying new table structure...")
-        with engine.connect() as conn:
+        with get_engine().connect() as conn:
             # Get list of tables
             result = conn.execute(text("""
                 SELECT table_name 
@@ -70,7 +70,7 @@ def recreate_database():
         print("\n🧪 Testing database functionality...")
         try:
             from sqlalchemy.orm import Session
-            db = models.SessionLocal()
+            db = models.get_session_local()()
             
             # Test creating a sample topic graph
             sample_topic_graph = [
