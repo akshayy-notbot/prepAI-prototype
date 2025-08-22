@@ -23,8 +23,10 @@ import redis
 from agents.interview_manager import create_interview_plan
 from agents.persona import generate_ai_question
 
-# Import Celery tasks from celery_app
-from celery_app import my_test_task, orchestrate_next_turn
+# Import agent functions directly (no more Celery!)
+from agents.interview_manager import create_interview_plan
+from agents.evaluation import evaluate_answer
+from agents.persona import generate_ai_question
 
 # WebSocket connection manager
 active_connections: list[WebSocket] = []
@@ -322,8 +324,8 @@ async def start_interview(request: StartInterviewRequest):
         return {"error": f"Unexpected error: {str(e)}"}, 500
 
 
-@app.post("/api/interview/{session_id}/next-question")
-async def get_next_question(session_id: str, request: Dict[str, Any]):
+# Old next-question endpoint removed - replaced by synchronous submit-answer!
+# async def get_next_question(session_id: str, request: Dict[str, Any]):
     """
     Gets the next question for an ongoing interview session.
     Takes the candidate's answer and generates the next appropriate question.
@@ -489,29 +491,173 @@ async def get_interview_status(session_id: str):
         return {"error": f"Unexpected error: {str(e)}"}, 500
 
 
-@app.post("/api/submit-answer", status_code=202)
+@app.post("/api/submit-answer")
 async def submit_answer(request: SubmitAnswerRequest):
     """
-    Receives an answer from the user and triggers the background 
-    orchestrator task to process it and generate the next question.
+    Receives an answer from the user, processes it synchronously,
+    and returns the next AI question immediately.
     """
-    # Explicit validation (from your LLM code)
+    # Validation
     if not request.session_id or not request.answer:
         raise HTTPException(status_code=400, detail="session_id and answer are required.")
     
     try:
-        # Trigger the background task
-        task = orchestrate_next_turn.delay(request.session_id, request.answer)
+        print(f"🎯 Processing answer for session {request.session_id}")
         
-        # Concise response with useful data (hybrid approach)
-        return {
-            "message": "Answer received and is being processed.",
-            "task_id": task.id  # Useful for monitoring
+        # Get Redis connection
+        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        redis_client = redis.from_url(redis_url, decode_responses=False)
+        
+        # A. Fetch the Current State from Redis
+        print("📥 Fetching current state from Redis...")
+        
+        # Get the interview plan
+        plan_json = redis_client.get(f"plan:{request.session_id}")
+        if not plan_json:
+            raise HTTPException(status_code=404, detail="Interview plan not found. Session may have expired.")
+        
+        plan = json.loads(plan_json.decode('utf-8') if isinstance(plan_json, bytes) else plan_json)
+        print(f"✅ Retrieved interview plan with {len(plan.get('goals', []))} goals")
+        
+        # Get the conversation history
+        history_json = redis_client.get(f"history:{request.session_id}")
+        if not history_json:
+            raise HTTPException(status_code=404, detail="Conversation history not found. Session may have expired.")
+        
+        conversation_history = json.loads(history_json.decode('utf-8') if isinstance(history_json, bytes) else history_json)
+        print(f"✅ Retrieved conversation history with {len(conversation_history)} turns")
+        
+        # B. Update the Conversation History
+        print("📝 Updating conversation history with user's answer...")
+        
+        if not conversation_history:
+            raise HTTPException(status_code=400, detail="Conversation history is empty")
+        
+        # Update the last turn's answer
+        last_turn = conversation_history[-1]
+        last_turn["answer"] = request.answer
+        print(f"✅ Updated last turn with user's answer: {request.answer[:50]}...")
+        
+        # C. Call the Evaluation Agent
+        print("🔍 Calling evaluation agent...")
+        
+        # Get the current goal from the plan
+        current_goal = None
+        for goal in plan.get("goals", []):
+            if goal.get("status") == "pending":
+                current_goal = goal
+                break
+        
+        if not current_goal:
+            raise HTTPException(status_code=400, detail="No pending goals found in interview plan")
+        
+        # Get the last question for context
+        last_question = last_turn.get("question", "")
+        
+        # Evaluate the user's answer
+        skills_to_assess = [current_goal.get("skill", "General")]
+        evaluation_result = evaluate_answer(
+            answer=request.answer,
+            question=last_question,
+            skills=skills_to_assess
+        )
+        
+        if not evaluation_result:
+            raise HTTPException(status_code=500, detail="Failed to evaluate answer")
+        
+        print(f"✅ Evaluation completed with overall score: {evaluation_result.get('overall_score', 'N/A')}")
+        
+        # D. Update Interview Plan Based on Evaluation
+        print("📊 Updating interview plan based on evaluation...")
+        
+        # Simple goal processing logic
+        if current_goal:
+            score = evaluation_result.get("scores", {}).get(current_goal["skill"], {}).get("score", 0)
+            if score >= 3:  # Consider a score of 3+ a successful probe
+                current_goal["probes_needed"] -= 1
+                print(f"✅ Decremented probes for {current_goal['skill']}: {current_goal['probes_needed'] + 1} -> {current_goal['probes_needed']}")
+                
+                if current_goal["probes_needed"] <= 0:
+                    current_goal["status"] = "covered"
+                    print(f"🎯 Goal '{current_goal['skill']}' marked as covered")
+        
+        # E. Determine the Next Action
+        print("🎯 Determining next action...")
+        
+        # Simple goal determination logic
+        next_goal = next((g for g in plan.get("goals", []) if g.get("status") == "pending"), None)
+        
+        if not next_goal:
+            # All goals are covered, interview is complete
+            print("🎉 All interview goals have been covered!")
+            new_ai_question = "Thank you, that concludes our interview. We will be in touch regarding the next steps."
+        else:
+            skill_name = next_goal.get("skill", "the required skills")
+            instruction = f"The current goal is to assess '{skill_name}'. Ask a question related to this skill, considering the conversation history."
+            print(f"🎯 Next target: {skill_name}")
+        
+        # F. Call the Persona Agent
+        print("🎭 Generating next question with persona agent...")
+        
+        if not next_goal:
+            # Interview is complete, question already set
+            print("✅ Interview complete, using final message")
+        else:
+            # Generate question for pending goal
+            persona = plan.get("persona", "Professional Interviewer")
+            new_ai_question = generate_ai_question(
+                persona=persona,
+                instructions=instruction,
+                history=conversation_history
+            )
+            
+            if new_ai_question.startswith("Error:"):
+                print(f"❌ Failed to generate question: {new_ai_question}")
+                # Fallback question
+                new_ai_question = f"Could you please elaborate on your experience with {skill_name}?"
+            
+            print(f"✅ Generated new question: {new_ai_question[:100]}...")
+        
+        # G. Save State and Return the New Question
+        print("💾 Saving updated state to Redis...")
+        
+        # Append new turn to history
+        new_turn = {
+            "question": new_ai_question,
+            "answer": None,
+            "timestamp": None,  # Will be set by the frontend
+            "question_type": "follow_up"
+        }
+        conversation_history.append(new_turn)
+        
+        # Save updated plan and history back to Redis
+        updated_plan_json = json.dumps(plan)
+        updated_history_json = json.dumps(conversation_history)
+        
+        redis_client.set(f"plan:{request.session_id}", updated_plan_json, ex=3600)
+        redis_client.set(f"history:{request.session_id}", updated_history_json, ex=3600)
+        
+        print("✅ Updated plan and history saved to Redis")
+        
+        # Return the new question immediately
+        result = {
+            "success": True,
+            "message": "Answer processed successfully",
+            "next_question": new_ai_question,
+            "session_id": request.session_id,
+            "goals_remaining": len([g for g in plan.get("goals", []) if g.get("status") == "pending"]),
+            "total_goals": len(plan.get("goals", [])),
+            "evaluation_score": evaluation_result.get("overall_score", "N/A"),
+            "timestamp": datetime.now().isoformat()
         }
         
+        print(f"🎉 Answer processing completed successfully for session {request.session_id}")
+        return result
+        
     except Exception as e:
-        # Focused error handling (from your LLM code)
-        raise HTTPException(status_code=500, detail=f"Failed to submit answer: {str(e)}")
+        error_msg = f"Failed to process answer: {str(e)}"
+        print(f"❌ {error_msg}")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.post("/api/interviews/{interview_id}/complete")

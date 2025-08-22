@@ -1070,8 +1070,27 @@ async function handleSubmitAnswer() {
         console.log('📨 Submit response status:', response.status);
         console.log('📨 Submit response headers:', response.headers);
         
-        if (response.status !== 202) {
-            // Handle error if the server didn't accept the request
+        if (response.ok) {
+            // Success - get the next question immediately
+            const responseData = await response.json();
+            console.log('✅ Answer submitted successfully:', responseData);
+            
+            if (responseData.success && responseData.next_question) {
+                console.log('🎉 Next question received immediately!');
+                
+                // Hide loading states
+                hideInputLoadingStates();
+                
+                // Handle the AI question
+                handleAIQuestion(responseData.next_question);
+                
+            } else {
+                console.error('❌ No next question in response:', responseData);
+                addMessageToChat("Error: Could not get next question.", 'system');
+                enableChatInput();
+            }
+        } else {
+            // Handle error
             const errorText = await response.text();
             console.error("Failed to submit answer. Status:", response.status, "Response:", errorText);
             addMessageToChat("Error: Could not submit answer.", 'system');
@@ -1079,22 +1098,7 @@ async function handleSubmitAnswer() {
             userInput.disabled = false;
             submitButton.disabled = false;
             hideInputLoadingStates();
-        } else {
-            // Success feedback (brief visual confirmation)
-            const responseData = await response.json();
-            console.log('✅ Answer submitted successfully:', responseData);
-            showInputLoadingState('success');
-            updateQuestionStatus('Answer submitted - waiting for AI response...');
-            
-            // Transition to waiting state after brief success indication
-            setTimeout(() => {
-                showInputLoadingState('typing');
-                updateQuestionStatus('AI is thinking...');
-            }, 1500);
         }
-        
-        // NOTE: We don't need to do anything else with the successful response.
-        // The WebSocket 'onmessage' handler is now responsible for handling the next question.
 
     } catch (error) {
         console.error("Error submitting answer:", error);
@@ -1112,7 +1116,6 @@ async function handleSubmitAnswer() {
 // Handle page refresh/restart
 function restart() {
     stopTimer();
-    cleanupWebSocket();
     location.reload();
 }
 
