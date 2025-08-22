@@ -5,32 +5,7 @@ import google.generativeai as genai
 from typing import List, Dict, Any, Optional, Tuple
 import redis
 from datetime import datetime
-
-# Configure Gemini API
-def get_gemini_client():
-    """Get configured Gemini client with API key"""
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-    
-    if not GOOGLE_API_KEY:
-        raise ValueError("GOOGLE_API_KEY environment variable not set")
-    
-    if GOOGLE_API_KEY == "your_gemini_api_key_here" or GOOGLE_API_KEY == "paste_your_google_api_key_here":
-        raise ValueError("GOOGLE_API_KEY is set to placeholder value. Please set your actual API key.")
-    
-    try:
-        genai.configure(api_key=GOOGLE_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        return model
-    except Exception as e:
-        raise ValueError(f"Failed to configure Gemini API: {str(e)}")
-
-def get_redis_client():
-    """Get configured Redis client"""
-    try:
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-        return redis.from_url(redis_url, decode_responses=True)
-    except Exception as e:
-        raise ValueError(f"Failed to configure Redis: {str(e)}")
+from .utils import get_gemini_client, get_redis_client
 
 # --- NEW ARCHITECTURE: Two-Prompt System ---
 
@@ -41,7 +16,13 @@ class RouterAgent:
     """
     
     def __init__(self):
-        self.model = get_gemini_client()
+        self._model = None  # Lazy initialization
+    
+    def _get_model(self):
+        """Lazy initialization of Gemini model"""
+        if self._model is None:
+            self._model = get_gemini_client()
+        return self._model
     
     def analyze_response(self, 
                         interviewer_persona_summary: str,
@@ -85,7 +66,7 @@ Analyze the user's response and provide the JSON output now."""
 
         try:
             # Call the Gemini API for fast classification
-            response = self.model.generate_content(prompt)
+            response = self._get_model().generate_content(prompt)
             response_text = response.text.strip()
             
             # Clean up the response
@@ -125,7 +106,13 @@ class GeneratorAgent:
     """
     
     def __init__(self):
-        self.model = get_gemini_client()
+        self._model = None  # Lazy initialization
+    
+    def _get_model(self):
+        """Lazy initialization of Gemini model"""
+        if self._model is None:
+            self._model = get_gemini_client()
+        return self._model
     
     def generate_response(self,
                          persona_role: str,
@@ -198,7 +185,7 @@ Your response MUST be a single, valid JSON object.
 
         try:
             # Call the Gemini API for powerful question generation
-            response = self.model.generate_content(prompt)
+            response = self._get_model().generate_content(prompt)
             response_text = response.text.strip()
             
             # Clean up the response
@@ -240,7 +227,13 @@ class PersonaAgent:
     def __init__(self):
         self.router_agent = RouterAgent()
         self.generator_agent = GeneratorAgent()
-        self.redis_client = get_redis_client()
+        self._redis_client = None  # Lazy initialization
+    
+    def _get_redis_client(self):
+        """Lazy initialization of Redis client"""
+        if self._redis_client is None:
+            self._redis_client = get_redis_client()
+        return self._redis_client
     
     def process_user_response(self, 
                             session_id: str,
@@ -343,7 +336,7 @@ class PersonaAgent:
     def _get_session_state(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get current session state from Redis (ONLY source of truth during interview)"""
         try:
-            state_json = self.redis_client.get(f"session_state:{session_id}")
+            state_json = self._get_redis_client().get(f"session_state:{session_id}")
             return json.loads(state_json) if state_json else None
         except Exception:
             return None
@@ -466,7 +459,7 @@ class PersonaAgent:
         """Save updated session state to Redis (ONLY Redis during interview)"""
         try:
             state_json = json.dumps(session_state)
-            self.redis_client.set(f"session_state:{session_id}", state_json, ex=3600)  # Expire in 1 hour
+            self._get_redis_client().set(f"session_state:{session_id}", state_json, ex=3600)  # Expire in 1 hour
         except Exception as e:
             print(f"Warning: Failed to save session state to Redis: {e}")
     
