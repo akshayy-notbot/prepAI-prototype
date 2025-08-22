@@ -68,6 +68,14 @@ except Exception as e:
     raise
 
 try:
+    print("🔍 Importing agents.archetype_selector...")
+    from agents.archetype_selector import select_interview_archetype
+    print("✅ agents.archetype_selector imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import agents.archetype_selector: {e}")
+    raise
+
+try:
     print("🔍 Importing agents.persona...")
     from agents.persona import PersonaAgent
     print("✅ agents.persona imported successfully")
@@ -360,6 +368,22 @@ async def start_interview(request: StartInterviewRequest):
             # NEW: Save session narrative separately
             redis_client.set(f"narrative:{session_id}", session_narrative, ex=3600)
             
+            # NEW: Save case study details separately (if available)
+            case_study_details = plan.get("case_study_details")
+            if case_study_details:
+                case_study_json = json.dumps(case_study_details)
+                redis_client.set(f"case_study:{session_id}", case_study_json, ex=3600)
+                print(f"✅ Case study details saved to Redis with key: case_study:{session_id}")
+            
+            # NEW: Save archetype information separately
+            archetype_info = {
+                "archetype": plan.get("archetype", "CASE_STUDY"),
+                "reasoning": plan.get("archetype_reasoning", "")
+            }
+            archetype_json = json.dumps(archetype_info)
+            redis_client.set(f"archetype:{session_id}", archetype_json, ex=3600)
+            print(f"✅ Archetype information saved to Redis with key: archetype:{session_id}")
+            
             print(f"✅ Interview plan and topic_graph saved to Redis with key: plan:{session_id}")
             
         except Exception as redis_error:
@@ -437,7 +461,12 @@ async def start_interview(request: StartInterviewRequest):
                 "total_topics": len(topic_graph),
                 "session_narrative": session_narrative,
                 "first_topic": topic_graph[0] if topic_graph else None
-            }
+            },
+            
+            # NEW: Archetype and Case Study Information
+            "archetype": plan.get("archetype", "CASE_STUDY"),
+            "archetype_reasoning": plan.get("archetype_reasoning", ""),
+            "case_study_details": plan.get("case_study_details", None)
         }
         
         print(f"🎯 Interview session {session_id} started successfully!")

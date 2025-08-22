@@ -61,25 +61,24 @@ class RouterAgent:
 
 **CONTEXT:**
 - Interviewer Persona: {interviewer_persona_summary}
-- Current Topic Goal: "{current_topic_goal}" (e.g., "Assess structured thinking in problem framing.")
+- Current Topic Goal: "{current_topic_goal}"
 - Conversation History (Last 2 turns): {conversation_history}
 - User's Latest Answer: "{user_latest_answer}"
 
 **YOUR TASK:**
-Analyze the user's answer in the context of the current topic's goal. Based on your analysis, you must decide if the goal has been achieved and what the immediate next action should be.
+Analyze the user's response. Is it a direct attempt to answer your question, or is it a clarifying question back to you? Based on this, decide if the topic goal has been achieved and what the immediate next action should be.
 
 **CRITICAL INSTRUCTIONS:**
 - Do NOT generate any interview questions or conversational text.
 - Your response MUST be a single, valid JSON object and nothing else.
 - Be extremely fast and efficient.
-- Focus on goal completion assessment, not numerical scoring.
+- **IMPORTANT**: If the user asks a question (e.g., "Can you tell me more about...", "What do you mean by...", "I'm not sure I understand..."), classify this as ANSWER_CLARIFICATION.
 
 **OUTPUT SCHEMA:**
 {{
-  "analysis_summary": "A 5-10 word summary of the user's answer.",
-  "goal_achieved": <true or false>,
-  "next_action": "<Choose ONE of the following: 'START_INTERVIEW' | 'ACKNOWLEDGE_AND_TRANSITION' | 'GENERATE_FOLLOW_UP' | 'REDIRECT_TO_TOPIC' | 'ANSWER_CLARIFICATION'>",
-  "qualitative_markers": ["<marker1>", "<marker2>"]  // Specific observations about their approach
+  "analysis_summary": "A 5-10 word summary of the user's response.",
+  "goal_achieved": <true or false, based on whether they answered the question>,
+  "next_action": "<Choose ONE: 'ACKNOWLEDGE_AND_TRANSITION' | 'GENERATE_FOLLOW_UP' | 'REDIRECT_TO_TOPIC' | 'ANSWER_CLARIFICATION'>"
 }}
 
 Analyze the user's response and provide the JSON output now."""
@@ -113,7 +112,6 @@ Analyze the user's response and provide the JSON output now."""
                 "analysis_summary": "Error analyzing response",
                 "goal_achieved": False,
                 "next_action": "GENERATE_FOLLOW_UP",
-                "qualitative_markers": ["error_occurred"],
                 "router_latency_ms": 0,
                 "error": str(e),
                 "timestamp": time.time()
@@ -133,6 +131,7 @@ class GeneratorAgent:
                          persona_company_context: str,
                          interview_style: str,
                          session_narrative: str,
+                         case_study_details: Optional[Dict[str, Any]],
                          topic_graph_json: List[Dict[str, Any]],
                          current_topic_id: str,
                          covered_topic_ids: List[str],
@@ -152,10 +151,10 @@ class GeneratorAgent:
 - Role: {persona_role}
 - Company Context: {persona_company_context}
 - Interview Style: {interview_style}
-- Your voice should be professional, insightful, and engaging.
 
 **2. THE MISSION CONTEXT (The Interview Plan):**
 - Session Narrative: "{session_narrative}"
+- Case Study Details (if available): {case_study_details}
 - Full Topic Graph: {topic_graph_json}
 - Session State: {{ "current_topic_id": "{current_topic_id}", "covered_topic_ids": {covered_topic_ids} }}
 
@@ -166,43 +165,39 @@ class GeneratorAgent:
 - Your required action is: **{triggering_action}**
 
 **5. RULES OF ENGAGEMENT (Follow these meticulously):**
-- **Be the Persona:** Your tone, phrasing, and the substance of your questions must perfectly match your assigned persona.
+- **Be the Persona:** Your tone, phrasing, and the substance of your questions must perfectly match your assigned persona and the company context.
 - **Navigate the Graph:** Your primary job is to guide the candidate through the `topic_graph`.
-- **Ask Open-Ended Questions:** Do not ask trivia. Probe for the 'why' and 'how'. Focus on trade-offs, reasoning, and first-principles thinking.
-- **Be Dynamic:** Your questions must feel like natural follow-ups, not a pre-written script. Weave in phrases from the user's last answer.
-- **Be Concise:** Get straight to the point. No long, rambling preambles. A real interviewer's time is valuable.
+- **Ask Open-Ended Questions:** Do not ask trivia. Probe for the 'why' and 'how'. Focus on trade-offs and reasoning.
+- **Be Dynamic:** Your questions should feel like natural follow-ups, not a pre-written script.
 
 **EXECUTE YOUR TASK:**
 Based on the `triggering_action`, generate your response.
 
 - **IF `triggering_action` is 'START_INTERVIEW'**:
   Your response MUST have three parts, delivered as a single, natural monologue:
-  1. **A brief greeting:** Introduce yourself according to your persona (e.g., "Hi, thanks for coming in today. My name is Alex and I'm a Senior PM on the growth team here.").
-  2. **Set the stage:** Clearly and concisely present the `session_narrative` to the candidate as the problem statement for today's interview.
-  3. **Ask the opening question:** Ask the first question related to the *first topic* in the `topic_graph`. Your question should flow naturally from the narrative you just presented.
-
-  **Example of a good opening:**
-  "Hi, thanks for your time today. I'm a Product Manager here at CampusConnect. So, for today's interview, I'd like to walk through a hypothetical scenario. Let's say our team is tasked with improving user engagement on our social media app, 'CampusConnect'. While we get a lot of sign-ups, we're seeing low retention and users aren't exploring many features. So, to start, what are some of your initial hypotheses about *why* college students might not be engaging as much as we'd expect?"
-
-- **IF `triggering_action` is 'ACKNOWLEDGE_AND_TRANSITION'**:
-  Your response MUST have two parts:
-  1. A brief, validating closing statement for the previous topic (e.g., "Okay, that clarifies your approach to user segmentation.").
-  2. A smooth transition to the *next* topic in the graph, followed by the first question for it. (e.g., "Let's move on. Now, thinking about execution, how would you go about building a roadmap for this feature?").
-
-- **IF `triggering_action` is 'GENERATE_FOLLOW_UP'**:
-  Ask a deeper, more probing question related to the `current_topic_id`. Use the `keywords_for_persona_agent` from the topic graph as your inspiration.
-
-- **IF `triggering_action` is 'REDIRECT_TO_TOPIC'**:
-  Gently but firmly guide the user back to the current topic. Acknowledge their point briefly, then pivot. (e.g., "That's an interesting tangent on marketing. For now, let's focus back on the technical trade-offs...").
+  1. A specific greeting: Introduce yourself and the company using the `companyName` from the `case_study_details`.
+  2. Set the stage: IF a `session_narrative` exists, present it to the candidate.
+  3. Ask the opening question based on the first topic in the graph.
 
 - **IF `triggering_action` is 'ANSWER_CLARIFICATION'**:
-  Provide a brief, helpful clarification to the user's question about the interview problem or process.
+  1. Consult the `case_study_details` JSON to find the relevant information to answer the user's question.
+  2. Provide a concise, helpful answer based on the facts.
+  3. Gently guide the conversation back by re-posing the original question. (e.g., "Does that give you enough context to start? I'm interested to hear your initial approach...").
+
+- **IF `triggering_action` is 'ACKNOWLEDGE_AND_TRANSITION'**:
+  Your response MUST have two parts: a brief closing statement for the previous topic and a transition to the next topic's question.
+
+- **IF `triggering_action` is 'GENERATE_FOLLOW_UP'**:
+  Ask a deeper, more probing question related to the `current_topic_id`.
+
+- **IF `triggering_action` is 'REDIRECT_TO_TOPIC'**:
+  Gently guide the user back to the current topic. Acknowledge their digression briefly then pivot.
 
 **OUTPUT SCHEMA:**
 Your response MUST be a single, valid JSON object.
 
 {{
-  "internal_thought": "A brief, one-sentence rationale for why you are asking this specific question. This is for system debugging and is not shown to the user.",
+  "internal_thought": "A brief, one-sentence rationale for why you are asking this specific question. This is for system debugging.",
   "response_text": "The exact words you will say to the candidate. This will be converted to speech."
 }}"""
 
@@ -272,6 +267,9 @@ class PersonaAgent:
                 # Initialize new session state
                 session_state = self._initialize_session_state(session_id, topic_graph)
             
+            # Step 1.5: Get case study details from Redis (NEW: Case Study Knowledge Base)
+            case_study_details = self._get_case_study_details(session_id)
+            
             # Step 2: Get current topic information
             current_topic = self._get_current_topic(topic_graph, session_state["current_topic_id"])
             if not current_topic:
@@ -287,6 +285,7 @@ class PersonaAgent:
                     persona_company_context="Tech Company",
                     interview_style="Professional and engaging",
                     session_narrative=session_narrative,
+                    case_study_details=case_study_details,  # NEW: Pass case study details
                     topic_graph_json=topic_graph,
                     current_topic_id=session_state["current_topic_id"],
                     covered_topic_ids=session_state.get("covered_topic_ids", []),
@@ -333,17 +332,18 @@ class PersonaAgent:
             
             # Step 6: Update session state based on Router analysis (Redis only)
             if router_result.get("goal_achieved", False):
-                session_state = self._mark_topic_completed(session_id, session_state, current_topic["topic_id"], router_result.get("qualitative_markers", []))
+                session_state = self._mark_topic_completed(session_id, session_state, current_topic["topic_id"])
                 session_state = self._advance_to_next_topic(session_id, session_state, topic_graph)
             
             # Step 7: Generate response based on Router's decision
-            if router_result["next_action"] in ["GENERATE_FOLLOW_UP", "ACKNOWLEDGE_AND_TRANSITION"]:
+            if router_result["next_action"] in ["GENERATE_FOLLOW_UP", "ACKNOWLEDGE_AND_TRANSITION", "ANSWER_CLARIFICATION"]:
                 # Use Generator Agent (Expensive - Target: < 3s)
                 generator_result = self.generator_agent.generate_response(
                     persona_role=interviewer_persona,
                     persona_company_context="Tech Company",
                     interview_style="Professional and engaging",
                     session_narrative=session_narrative,
+                    case_study_details=case_study_details,  # NEW: Pass case study details
                     topic_graph_json=topic_graph,
                     current_topic_id=session_state["current_topic_id"],
                     covered_topic_ids=session_state.get("covered_topic_ids", []),
@@ -452,7 +452,7 @@ class PersonaAgent:
         
         return formatted_history
     
-    def _mark_topic_completed(self, session_id: str, session_state: Dict[str, Any], topic_id: str, qualitative_markers: List[str]) -> Dict[str, Any]:
+    def _mark_topic_completed(self, session_id: str, session_state: Dict[str, Any], topic_id: str) -> Dict[str, Any]:
         """Mark a topic as completed and update progress with qualitative markers (Redis only)"""
         if topic_id not in session_state["covered_topic_ids"]:
             session_state["covered_topic_ids"].append(topic_id)
@@ -461,7 +461,7 @@ class PersonaAgent:
             session_state["topic_progress"][topic_id]["status"] = "completed"
             session_state["topic_progress"][topic_id]["goal_achieved"] = True
             # Store qualitative markers instead of numerical scores
-            session_state["topic_progress"][topic_id]["qualitative_markers"] = qualitative_markers
+            session_state["topic_progress"][topic_id]["qualitative_markers"] = []
         
         return session_state
     
@@ -576,5 +576,16 @@ class PersonaAgent:
             print(f"❌ Failed to persist final state to PostgreSQL: {e}")
             db_session.rollback()
             return False
+
+    def _get_case_study_details(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get case study details from Redis for context-aware responses"""
+        try:
+            case_study_json = self.redis_client.get(f"case_study:{session_id}")
+            if case_study_json:
+                return json.loads(case_study_json)
+            return None
+        except Exception as e:
+            print(f"Warning: Failed to retrieve case study details: {e}")
+            return None
 
 

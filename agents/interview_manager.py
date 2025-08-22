@@ -4,6 +4,9 @@ from typing import List, Dict, Any
 import os
 import json
 import google.generativeai as genai
+from .archetype_selector import select_interview_archetype
+from .temperature_manager import TemperatureManager
+
 # Configure Gemini API
 def get_gemini_client():
     """Get configured Gemini client with API key"""
@@ -21,6 +24,56 @@ def get_gemini_client():
         return model
     except Exception as e:
         raise ValueError(f"Failed to configure Gemini API: {str(e)}")
+
+def load_prompt_template(archetype: str) -> str:
+    """
+    Load the appropriate prompt template based on the interview archetype.
+    
+    Args:
+        archetype (str): The interview archetype (CASE_STUDY, BEHAVIORAL_DEEP_DIVE, TECHNICAL_KNOWLEDGE_SCREEN, MIXED)
+    
+    Returns:
+        str: The prompt template content
+    """
+    prompt_file_map = {
+        "CASE_STUDY": "prompts/case_study_prompt.txt",
+        "BEHAVIORAL_DEEP_DIVE": "prompts/behavioral_prompt.txt", 
+        "TECHNICAL_KNOWLEDGE_SCREEN": "prompts/technical_knowledge_prompt.txt",
+        "MIXED": "prompts/case_study_prompt.txt"  # Mixed uses case study as default
+    }
+    
+    prompt_file = prompt_file_map.get(archetype, "prompts/case_study_prompt.txt")
+    
+    try:
+        with open(prompt_file, 'r') as f:
+            template = f.read()
+        return template
+    except FileNotFoundError:
+        # Fallback to case study prompt if file not found
+        print(f"Warning: Prompt file {prompt_file} not found, using case study prompt as fallback")
+        try:
+            with open("prompts/case_study_prompt.txt", 'r') as f:
+                template = f.read()
+            return template
+        except FileNotFoundError:
+            # Ultimate fallback - return a basic template
+            return """You are an AI Interview Architect. Generate a topic graph for {role} at {seniority} level focusing on {skills}.
+
+{{
+  "session_narrative": "Interview scenario for {role} position",
+  "case_study_details": null,
+  "topic_graph": [
+    {{
+      "topic_id": "topic_1",
+      "primary_skill": "{skills[0] if skills else 'General'}",
+      "topic_name": "Skill Assessment",
+      "question_pattern": "How would you approach {skills[0] if skills else 'this challenge'}?",
+      "goal": "Assess understanding of {skills[0] if skills else 'the topic'}",
+      "dependencies": [],
+      "keywords_for_persona_agent": ["approach", "challenge", "understanding"]
+    }}
+  ]
+}}"""
 
 def create_interview_plan_with_ai(role: str, seniority: str, skills: List[str]) -> Dict[str, Any]:
     """
@@ -42,6 +95,30 @@ def create_interview_plan_with_ai(role: str, seniority: str, skills: List[str]) 
     # Create timestamp for session start
     start_time = datetime.utcnow()
     
+    # Step 1: Select Interview Archetype
+    print(f"🎯 Selecting interview archetype for {role} at {seniority} level...")
+    archetype_result = select_interview_archetype(role, seniority, skills)
+    
+    if "error" in archetype_result:
+        print(f"⚠️ Archetype selection failed: {archetype_result['error']}, using CASE_STUDY as fallback")
+        archetype = "CASE_STUDY"
+        reasoning = "Fallback due to archetype selection error"
+    else:
+        archetype = archetype_result["archetype"]
+        reasoning = archetype_result["reasoning"]
+    
+    print(f"✅ Selected archetype: {archetype} - {reasoning}")
+    
+    # Step 2: Load the appropriate prompt template
+    prompt_template = load_prompt_template(archetype)
+    
+    # Step 3: Format the prompt with user context
+    prompt = prompt_template.format(
+        role=role,
+        seniority=seniority,
+        skills=', '.join(skills)
+    )
+    
     # Configure Gemini client
     try:
         model = get_gemini_client()
@@ -51,48 +128,13 @@ def create_interview_plan_with_ai(role: str, seniority: str, skills: List[str]) 
             "session_id": session_id,
             "status": "failed"
         }
-    
-    # NEW ARCHITECTURE: Lean, Strategic Prompt for Topic Graph Generation
-    prompt = f"""You are a meticulous AI Interview Architect. Your role is to design a structured, machine-readable blueprint for a hyper-realistic interview simulation. You will not generate the questions themselves, but rather the logical flow and key topics for the Persona Agent to use.
-
-**CONTEXT:**
-- Role: {role}
-- Seniority: {seniority}
-- Core Skills to Assess: {', '.join(skills)}
-
-**PRIMARY DIRECTIVE:**
-Generate a topic graph for a single, cohesive interview session. This graph must be structured around a central, realistic case study or project scenario appropriate for the candidate's role and seniority.
-
-**DESIGN PRINCIPLES:**
-1.  **Narrative First**: Start by creating a brief, engaging scenario that will serve as the backdrop for the entire interview. This makes the interview feel like a real project discussion, not a random quiz.
-2.  **Topic Granularity**: Break down each primary skill into specific, assessable topics. Each topic should represent a single conversational turn or a small set of related probes.
-3.  **Logical Dependencies**: Structure the topics in a logical sequence. A foundational topic must appear before an advanced one that depends on it.
-4.  **Actionable Keywords**: For each topic, provide a set of concrete keywords. These keywords are the direct input for the Persona Agent to generate its specific questions. They are the bridge between your plan and the live interview.
-5.  **Efficiency**: Your output is a blueprint for another AI. Be concise. Avoid conversational filler and long descriptions.
-
-**OUTPUT SCHEMA:**
-Your response MUST be a single, valid JSON object, enclosed within <JSON_OUTPUT> tags. Adhere strictly to this schema:
-
-<JSON_OUTPUT>
-{{
-  "session_narrative": "A brief, 1-2 sentence project scenario to provide context for the entire interview. (e.g., 'Your team is tasked with designing a new feature for our e-commerce platform to provide personalized recommendations to users.')",
-  "topic_graph": [
-    {{
-      "topic_id": "<unique_id_string_for_this_topic, e.g., 'PM_01_Problem_Definition'>",
-      "primary_skill": "<The main skill this topic assesses, from the user's list>",
-      "topic_name": "<A short, descriptive name for this topic, e.g., 'Defining User Personas'>",
-      "goal": "<A concise (under 10 words) description of the signal you are trying to capture, e.g., 'Assess structured thinking in problem framing.'>",
-      "dependencies": ["<list of topic_ids that must precede this one, or an empty list []>"],
-      "keywords_for_persona_agent": ["<keyword1>", "<keyword2>", "<keyword3>"]
-    }}
-  ]
-}}
-</JSON_OUTPUT>
-
-Generate the interview blueprint now."""
 
     try:
-        # Call the Gemini API
+        # Call the Gemini API with temperature 0.8 for creativity and uniqueness
+        print(f"🚀 Generating interview plan with temperature 0.8 for {archetype} archetype...")
+        
+        # Use temperature manager for creative generation (temp 0.8)
+        model = TemperatureManager.get_model_with_config("CREATIVE_GENERATION")
         response = model.generate_content(prompt)
         response_text = response.text.strip()
         
@@ -124,6 +166,7 @@ Generate the interview blueprint now."""
         # Extract the topic graph and session narrative
         topic_graph = ai_generated_plan.get("topic_graph", [])
         session_narrative = ai_generated_plan.get("session_narrative", "")
+        case_study_details = ai_generated_plan.get("case_study_details", None)
         
         # Transform topic graph into our standardized format
         goals = []
@@ -160,9 +203,14 @@ Generate the interview blueprint now."""
             "current_topic_id": goals[0]["topic_id"] if goals else None,
             "covered_topic_ids": [],
             
+            # NEW: Archetype Information
+            "archetype": archetype,
+            "archetype_reasoning": reasoning,
+            "case_study_details": case_study_details,
+            
             # Legacy metadata for backward compatibility
             "ai_generated_metadata": {
-                "overall_approach": f"Structured interview with {len(goals)} topics",
+                "overall_approach": f"Structured {archetype.lower().replace('_', ' ')} interview with {len(goals)} topics",
                 "difficulty_progression": "mixed",
                 "evaluation_criteria": {},
                 "interviewer_context": {"role": f"{seniority} {role}"}
@@ -259,5 +307,9 @@ def get_plan_summary(interview_plan: Dict[str, Any]) -> Dict[str, Any]:
         "skills_breakdown": goals_by_skill,
         "session_narrative": interview_plan.get("session_narrative", ""),
         "current_topic_id": interview_plan.get("current_topic_id"),
-        "covered_topic_ids": interview_plan.get("covered_topic_ids", [])
+        "covered_topic_ids": interview_plan.get("covered_topic_ids", []),
+        # NEW: Archetype and case study information
+        "archetype": interview_plan.get("archetype", "CASE_STUDY"),
+        "archetype_reasoning": interview_plan.get("archetype_reasoning", ""),
+        "case_study_details": interview_plan.get("case_study_details", None)
     }
