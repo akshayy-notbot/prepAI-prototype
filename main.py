@@ -4,27 +4,84 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 # Load environment variables from .env file if it exists
-from dotenv import load_dotenv
+try:
+    print("🔍 Importing dotenv...")
+    from dotenv import load_dotenv
+    print("✅ dotenv imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import dotenv: {e}")
+    raise
+
 load_dotenv()
 
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+try:
+    print("🔍 Importing FastAPI components...")
+    from fastapi import FastAPI, Depends, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    from sqlalchemy.orm import Session
+    from sqlalchemy import text
+    print("✅ FastAPI components imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import FastAPI components: {e}")
+    raise
 
-import models
-import google.generativeai as genai
-import redis
+try:
+    print("🔍 Importing typing...")
+    from typing import List, Dict, Any
+    print("✅ typing imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import typing: {e}")
+    raise
+
+try:
+    print("🔍 Importing models...")
+    import models
+    print("✅ models imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import models: {e}")
+    raise
+
+try:
+    print("🔍 Importing google.generativeai...")
+    import google.generativeai as genai
+    print("✅ google.generativeai imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import google.generativeai: {e}")
+    raise
+
+try:
+    print("🔍 Importing redis...")
+    import redis
+    print("✅ redis imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import redis: {e}")
+    raise
 
 # Import our new AI-powered interview components
-from agents.interview_manager import create_interview_plan
-from agents.persona import PersonaAgent
+try:
+    print("🔍 Importing agents.interview_manager...")
+    from agents.interview_manager import create_interview_plan
+    print("✅ agents.interview_manager imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import agents.interview_manager: {e}")
+    raise
 
-# Import agent functions directly (no more Celery!)
-from agents.interview_manager import create_interview_plan
-from agents.evaluation import evaluate_answer
+try:
+    print("🔍 Importing agents.persona...")
+    from agents.persona import PersonaAgent
+    print("✅ agents.persona imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import agents.persona: {e}")
+    raise
 
+try:
+    print("🔍 Importing agents.evaluation...")
+    from agents.evaluation import evaluate_answer
+    print("✅ agents.evaluation imported successfully")
+except Exception as e:
+    print(f"❌ Failed to import agents.evaluation: {e}")
+    raise
 
 
 # --- FastAPI App Initialization ---
@@ -71,23 +128,51 @@ async def startup_event():
     
     try:
         # Create database tables (moved from import time to startup)
-        print("🗄️ Creating database tables...")
-        models.create_tables()
-        print("✅ Database tables created successfully")
+        print("🗄️ Starting database schema migration...")
+        try:
+            models.create_tables()
+            print("✅ Database tables created successfully")
+        except Exception as db_error:
+            print(f"❌ Database schema migration failed: {db_error}")
+            print("⚠️  This might be due to:")
+            print("   • User lacks CREATE TABLE permissions")
+            print("   • PostgreSQL version doesn't support JSONB")
+            print("   • Schema conflicts with existing tables")
+            print("   • Database connection issues")
+            print("\n🔍 Check Render PostgreSQL service configuration")
+            raise db_error
         
         # Import startup script functions
-        from startup import run_startup_checks
+        try:
+            print("🔍 Importing startup script...")
+            from startup import run_startup_checks
+            print("✅ Startup script imported successfully")
+        except Exception as startup_import_error:
+            print(f"❌ Failed to import startup script: {startup_import_error}")
+            print("⚠️  Startup validation will be skipped")
+            return
         
         # Run startup checks
-        success = run_startup_checks()
-        if success:
-            print("✅ PrepAI Backend is ready to serve requests!")
-        else:
-            print("❌ PrepAI Backend startup failed - some features may not work")
+        try:
+            print("🔍 Running startup validation...")
+            success = run_startup_checks()
+            if success:
+                print("✅ PrepAI Backend is ready to serve requests!")
+            else:
+                print("❌ PrepAI Backend startup failed - some features may not work")
+        except Exception as startup_error:
+            print(f"❌ Startup validation failed: {startup_error}")
+            print("⚠️  Service will continue but may have issues")
             
     except Exception as e:
-        print(f"❌ Startup error: {e}")
-        print("⚠️  Service will continue but may have issues")
+        print(f"❌ Critical startup error: {e}")
+        print("🚨 Service cannot start properly")
+        print("📋 Troubleshooting steps:")
+        print("   1. Check Render PostgreSQL service status")
+        print("   2. Verify DATABASE_URL in environment variables")
+        print("   3. Check database user permissions")
+        print("   4. Ensure PostgreSQL version supports JSONB")
+        raise e
 
 # Pydantic model for request body validation
 class InterviewCreate(BaseModel):
@@ -111,7 +196,7 @@ class SubmitAnswerRequest(BaseModel):
 
 # Dependency to get a database session for each request
 def get_db():
-    db = models.SessionLocal()
+    db = models.get_session_local()()
     try:
         yield db
     finally:

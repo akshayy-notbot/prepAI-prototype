@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
 import uuid
+from sqlalchemy import text
 
 # Use the DATABASE_URL from the environment (Render will provide this)
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -307,10 +308,72 @@ class Question(Base):
 
 # --- Function to create tables ---
 def create_tables():
-    """Create all database tables"""
+    """Create all database tables with robust error handling"""
     try:
-        Base.metadata.create_all(bind=get_engine())
+        print("🗄️ Starting database schema migration...")
+        
+        # Get engine and test connection
+        engine = get_engine()
+        
+        # Test basic connection first
+        with engine.connect() as conn:
+            # Check PostgreSQL version
+            result = conn.execute(text("SELECT version()"))
+            version = result.fetchone()[0]
+            print(f"✅ Connected to PostgreSQL: {version[:50]}...")
+            
+            # Check if we can create tables
+            result = conn.execute(text("SELECT current_user, current_database()"))
+            user, db_name = result.fetchone()
+            print(f"✅ Connected as user '{user}' to database '{db_name}'")
+            
+            # Check user permissions
+            result = conn.execute(text("""
+                SELECT has_table_privilege(current_user, 'information_schema.tables', 'SELECT') as can_select,
+                       has_schema_privilege(current_user, 'public', 'CREATE') as can_create
+            """))
+            perms = result.fetchone()
+            print(f"✅ User permissions - SELECT: {perms[0]}, CREATE: {perms[1]}")
+        
+        # Now try to create tables
+        print("📋 Creating new database schema...")
+        Base.metadata.create_all(bind=engine)
         print("✅ Database tables created/verified successfully")
+        
+        # Verify tables were created
+        with engine.connect() as conn:
+            inspector = engine.dialect.inspector(engine)
+            existing_tables = inspector.get_table_names()
+            
+            expected_tables = [
+                'interview_sessions', 'session_states', 'topic_graphs',
+                'analysis_orchestrators', 'specialist_agents', 'user_responses',
+                'analysis_results', 'skill_performance', 'interviews', 'questions'
+            ]
+            
+            missing_tables = [table for table in expected_tables if table not in existing_tables]
+            if missing_tables:
+                print(f"⚠️ Warning: Some tables missing: {missing_tables}")
+            else:
+                print("✅ All expected tables verified")
+                
     except Exception as e:
-        print(f"❌ Error creating tables: {e}")
+        error_msg = str(e).lower()
+        
+        if "permission denied" in error_msg:
+            print("❌ Permission denied. User cannot create tables.")
+            print("   Solution: Grant CREATE permission to database user")
+        elif "does not exist" in error_msg:
+            print("❌ Database or schema does not exist.")
+            print("   Solution: Check DATABASE_URL and database existence")
+        elif "jsonb" in error_msg:
+            print("❌ JSONB field error. PostgreSQL version might be too old.")
+            print("   Solution: Ensure PostgreSQL 9.4+ for JSONB support")
+        elif "syntax error" in error_msg:
+            print("❌ SQL syntax error during table creation.")
+            print("   Solution: Check table definitions for syntax issues")
+        else:
+            print(f"❌ Unexpected error creating tables: {e}")
+        
+        print(f"\n🔍 Full error details: {e}")
         raise e
