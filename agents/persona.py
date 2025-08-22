@@ -26,11 +26,26 @@ def get_gemini_client():
 def get_redis_client():
     """Get configured Redis client"""
     try:
+        print(f"🔗 Getting Redis URL from environment...")
         redis_url = os.environ.get('REDIS_URL')
         if not redis_url:
+            print(f"❌ REDIS_URL environment variable is required")
             raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
-        return redis.from_url(redis_url, decode_responses=True)
+        
+        print(f"✅ REDIS_URL found, length: {len(redis_url)}")
+        
+        print(f"🚀 Creating Redis client...")
+        client = redis.from_url(redis_url, decode_responses=True)
+        print(f"✅ Redis client created successfully")
+        
+        if not client:
+            print(f"❌ Failed to create Redis client instance")
+            raise ValueError("Failed to create Redis client instance")
+        
+        print(f"✅ Redis client ready")
+        return client
     except Exception as e:
+        print(f"❌ Failed to configure Redis: {e}")
         raise ValueError(f"Failed to configure Redis: {str(e)}")
 
 # --- NEW ARCHITECTURE: Two-Prompt System ---
@@ -274,8 +289,6 @@ class PersonaAgent:
             
             # Step 2: Get current topic information
             current_topic = self._get_current_topic(topic_graph, session_state["current_topic_id"])
-            if not current_topic:
-                raise ValueError(f"Current topic {session_state['current_topic_id']} not found in topic graph")
             
             # Step 3: Check if this is the first question (no conversation history)
             is_first_question = len(session_state.get("conversation_history", [])) == 0 and not user_answer
@@ -386,10 +399,10 @@ class PersonaAgent:
             }
             
         except Exception as e:
+            print(f"❌ Error in PersonaAgent.process_user_response: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "fallback_response": "I appreciate your response. Let me ask a follow-up question to better understand your approach.",
                 "session_id": session_id
             }
     
@@ -397,14 +410,25 @@ class PersonaAgent:
         """Get current session state from Redis (ONLY source of truth during interview)"""
         try:
             state_json = self.redis_client.get(f"session_state:{session_id}")
-            return json.loads(state_json) if state_json else None
-        except Exception:
+            if state_json:
+                state = json.loads(state_json)
+                if not isinstance(state, dict):
+                    print(f"Warning: Invalid session state format for {session_id}, reinitializing")
+                    return None
+                return state
+            return None
+        except Exception as e:
+            print(f"Warning: Failed to retrieve session state from Redis: {e}")
             return None
     
     def _initialize_session_state(self, session_id: str, topic_graph: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Initialize new session state for a fresh interview (Redis only)"""
+        if not topic_graph or len(topic_graph) == 0:
+            # If topic_graph is empty, we can't proceed - this should be caught earlier
+            raise ValueError("Cannot initialize session state with empty topic graph")
+        
         initial_state = {
-            "current_topic_id": topic_graph[0]["topic_id"] if topic_graph else "topic_01",
+            "current_topic_id": topic_graph[0]["topic_id"] if topic_graph else None,
             "covered_topic_ids": [],
             "conversation_history": [],
             "topic_progress": {},
@@ -428,10 +452,16 @@ class PersonaAgent:
     
     def _get_current_topic(self, topic_graph: List[Dict[str, Any]], topic_id: str) -> Optional[Dict[str, Any]]:
         """Get current topic information from topic graph"""
+        if not topic_graph or len(topic_graph) == 0:
+            # If topic_graph is empty, we can't proceed - this should be caught earlier
+            raise ValueError("Cannot get current topic from empty topic graph")
+        
         for topic in topic_graph:
             if topic["topic_id"] == topic_id:
                 return topic
-        return None
+        
+        # If topic_id not found, raise an error - this indicates a data integrity issue
+        raise ValueError(f"Topic {topic_id} not found in topic graph")
     
     def _prepare_conversation_history(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Prepare conversation history for the agents (last 2-3 turns)"""
@@ -582,7 +612,11 @@ class PersonaAgent:
         try:
             case_study_json = self.redis_client.get(f"case_study:{session_id}")
             if case_study_json:
-                return json.loads(case_study_json)
+                case_study = json.loads(case_study_json)
+                if not isinstance(case_study, dict):
+                    print(f"Warning: Invalid case study format for {session_id}, using fallback")
+                    return None
+                return case_study
             return None
         except Exception as e:
             print(f"Warning: Failed to retrieve case study details: {e}")

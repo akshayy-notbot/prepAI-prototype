@@ -36,13 +36,13 @@ def select_interview_archetype(role: str, seniority: str, skills: list) -> Dict[
     
     try:
         # Use temperature manager for consistent classification (temp 0.3)
+        print(f"🌡️ Getting model with CLASSIFICATION config...")
         model = TemperatureManager.get_model_with_config("CLASSIFICATION")
+        print(f"✅ Model configured successfully")
     except Exception as e:
-        return {
-            "error": f"Failed to configure Gemini API: {str(e)}",
-            "archetype": "CASE_STUDY",  # Fallback to case study
-            "reasoning": "Fallback due to API configuration error"
-        }
+        print(f"❌ Failed to configure Gemini API: {e}")
+        # If we can't even configure the API, this is a critical error
+        raise ValueError(f"Failed to configure Gemini API for archetype selection: {str(e)}")
     
     prompt = f"""You are an expert AI career coach and interview planner. Your job is to analyze a user's career goals and the skills they want to practice to determine the most effective interview format for them.
 
@@ -70,19 +70,29 @@ Your response MUST be a single, valid JSON object and nothing else.
 
     try:
         # Call the Gemini API with temperature 0.3 for consistent classification
+        print(f"📤 Sending archetype selection prompt to Gemini API...")
         response = model.generate_content(prompt)
+        print(f"✅ Gemini API response received")
+        
         response_text = response.text.strip()
+        print(f"🔍 Raw response length: {len(response_text)}")
+        print(f"🔍 Raw response preview: {response_text[:200]}...")
         
         # Clean up the response text
         if response_text.startswith("```json"):
             response_text = response_text[7:]
+            print(f"🔍 Removed opening ```json")
         if response_text.endswith("```"):
             response_text = response_text[:-3]
+            print(f"🔍 Removed closing ```")
         
         response_text = response_text.strip()
+        print(f"🔍 Cleaned response length: {len(response_text)}")
         
         # Parse the JSON response
-        result = json.loads(response_text)
+        print(f"🔍 Attempting to parse JSON...")
+        result = json.loads(response_text.strip())
+        print(f"✅ JSON parsed successfully")
         
         # Validate the structure
         if not isinstance(result, dict):
@@ -91,17 +101,17 @@ Your response MUST be a single, valid JSON object and nothing else.
         if "archetype" not in result:
             raise ValueError("Response missing required archetype field")
         
+        print(f"✅ Archetype selection successful: {result['archetype']}")
         return result
         
     except json.JSONDecodeError as e:
-        return {
-            "error": f"Failed to parse AI response as JSON: {str(e)}",
-            "archetype": "CASE_STUDY",  # Fallback to case study
-            "reasoning": "Fallback due to JSON parsing error"
-        }
+        print(f"❌ JSON decode error in archetype selection: {e}")
+        print(f"🔍 Response text that failed to parse: {response_text[:500]}...")
+        # If we can't parse the AI response, this is a critical error
+        raise ValueError(f"Failed to parse AI response as JSON in archetype selection: {str(e)}")
     except Exception as e:
-        return {
-            "error": f"Unexpected error during archetype selection: {str(e)}",
-            "archetype": "CASE_STUDY",  # Fallback to case study
-            "reasoning": "Fallback due to unexpected error"
-        }
+        print(f"❌ Unexpected error during archetype selection: {e}")
+        print(f"🔍 Error type: {type(e)}")
+        print(f"🔍 Error details: {str(e)}")
+        # If we get an unexpected error, this is a critical error
+        raise ValueError(f"Unexpected error during archetype selection: {str(e)}")

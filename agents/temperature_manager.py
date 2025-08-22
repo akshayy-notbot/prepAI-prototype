@@ -74,25 +74,42 @@ class TemperatureManager:
         """
         import os
         
+        print(f"🌡️ TemperatureManager: Getting model for task type: {task_type}")
+        
         GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
         if not GOOGLE_API_KEY:
+            print(f"❌ GOOGLE_API_KEY environment variable not set")
             raise ValueError("GOOGLE_API_KEY environment variable not set")
         
+        print(f"✅ GOOGLE_API_KEY found, length: {len(GOOGLE_API_KEY)}")
+        
         try:
+            print(f"🤖 Configuring Gemini API...")
             genai.configure(api_key=GOOGLE_API_KEY)
+            print(f"✅ Gemini API configured successfully")
             
             # Get generation config for this task
+            print(f"⚙️ Getting generation config for task type: {task_type}")
             generation_config = cls.get_generation_config(task_type, **kwargs)
+            print(f"✅ Generation config created: {generation_config}")
             
             # Create model with the config
+            print(f"🚀 Creating GenerativeModel with config...")
             model = genai.GenerativeModel(
                 'gemini-1.5-flash',
                 generation_config=generation_config
             )
+            print(f"✅ GenerativeModel created successfully")
             
+            if not model:
+                print(f"❌ Failed to create Gemini model instance")
+                raise ValueError("Failed to create Gemini model instance")
+            
+            print(f"✅ TemperatureManager model ready")
             return model
             
         except Exception as e:
+            print(f"❌ Failed to configure Gemini API: {e}")
             raise ValueError(f"Failed to configure Gemini API: {str(e)}")
 
 # Convenience functions for common use cases

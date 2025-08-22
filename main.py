@@ -332,7 +332,18 @@ async def start_interview(request: StartInterviewRequest):
             skills=request.skills
         )
         
-        # Check if plan creation failed
+        # Debug: Print plan information
+        print(f"🔍 Plan creation result: {type(plan)}")
+        if plan:
+            print(f"🔍 Plan keys: {list(plan.keys()) if isinstance(plan, dict) else 'Not a dict'}")
+        else:
+            print(f"🔍 Plan is None or falsy")
+        
+        # Check if plan creation failed or returned None
+        if not plan:
+            print(f"❌ Failed to create interview plan: plan is None")
+            return {"error": "Failed to create interview plan: plan is None"}, 500
+        
         if "error" in plan:
             print(f"❌ Failed to create interview plan: {plan['error']}")
             return {"error": f"Failed to create interview plan: {plan['error']}"}, 500
@@ -378,7 +389,7 @@ async def start_interview(request: StartInterviewRequest):
             # NEW: Save archetype information separately
             archetype_info = {
                 "archetype": plan.get("archetype", "CASE_STUDY"),
-                "reasoning": plan.get("archetype_reasoning", "")
+                "reasoning": plan.get("archetype_reasoning", ""),
             }
             archetype_json = json.dumps(archetype_info)
             redis_client.set(f"archetype:{session_id}", archetype_json, ex=3600)
@@ -476,7 +487,16 @@ async def start_interview(request: StartInterviewRequest):
         
         return response_data
         
+    except ValueError as e:
+        # Handle validation errors gracefully
+        print(f"❌ Validation error in start_interview: {e}")
+        return {"error": f"Interview configuration error: {str(e)}"}, 400
+    except FileNotFoundError as e:
+        # Handle missing configuration files gracefully
+        print(f"❌ Configuration file missing in start_interview: {e}")
+        return {"error": f"System configuration error: {str(e)}"}, 500
     except Exception as e:
+        # Handle all other unexpected errors gracefully
         print(f"❌ Unexpected error in start_interview: {e}")
         return {"error": f"Unexpected error: {str(e)}"}, 500
 
@@ -512,7 +532,7 @@ async def get_interview_status(session_id: str):
             
             # NEW: Get topic_graph and session narrative
             topic_graph_json = redis_client.get(f"topic_graph:{session_id}")
-            topic_graph = json.loads(topic_graph_json.decode('utf-8')) if topic_graph_json else []
+            topic_graph = json.loads(topic_graph_json.decode('utf-8') if topic_graph_json else [])
             
             narrative = redis_client.get(f"narrative:{session_id}")
             session_narrative = narrative.decode('utf-8') if narrative else ""
