@@ -6,11 +6,28 @@ from datetime import datetime
 import os
 import uuid
 
-# Use the DATABASE_URL from the environment, with a local default
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://prepaiuser:prepaipassword@localhost/prepaidb")
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# Use the DATABASE_URL from the environment (Render will provide this)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required. Please set it in Render dashboard.")
+
+# Lazy initialization - only create engine when needed
+def get_engine():
+    """Get database engine (lazy initialization)"""
+    return create_engine(DATABASE_URL)
+
+def get_session_local():
+    """Get database session factory (lazy initialization)"""
+    return sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+
+# Legacy aliases for backward compatibility
+def get_engine_legacy():
+    """Legacy function - use get_engine() instead"""
+    return get_engine()
+
+def get_session_local_legacy():
+    """Legacy function - use get_session_local() instead"""
+    return get_session_local()
 
 # --- Enhanced Table Definitions for New Architecture ---
 
@@ -289,7 +306,7 @@ class Question(Base):
 def create_tables():
     """Create all database tables"""
     try:
-        Base.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=get_engine())
         print("✅ Database tables created/verified successfully")
     except Exception as e:
         print(f"❌ Error creating tables: {e}")

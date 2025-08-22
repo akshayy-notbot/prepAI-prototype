@@ -48,7 +48,9 @@ def check_environment():
 def get_redis_client():
     """Get Redis client for testing"""
     try:
-        redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+        redis_url = os.getenv('REDIS_URL')
+        if not redis_url:
+            raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
         client = redis.from_url(redis_url)
         client.ping()  # Test connection
         print("✅ Redis connection successful")

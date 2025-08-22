@@ -51,8 +51,7 @@ app.add_middleware(
 )
 
 # --- Database Setup ---
-# This line creates the database tables if they don't exist when the app starts
-models.create_tables()
+# Database tables will be created in the startup event, not during import
 
 # --- Health Check Endpoint ---
 @app.get("/health")
@@ -71,6 +70,11 @@ async def startup_event():
     print("🚀 PrepAI Backend Starting Up...")
     
     try:
+        # Create database tables (moved from import time to startup)
+        print("🗄️ Creating database tables...")
+        models.create_tables()
+        print("✅ Database tables created successfully")
+        
         # Import startup script functions
         from startup import run_startup_checks
         
@@ -255,7 +259,9 @@ async def start_interview(request: StartInterviewRequest):
         
         # Step 2: Save the Plan to Redis (NEW: Includes topic_graph)
         try:
-            redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+            redis_url = os.environ.get('REDIS_URL')
+            if not redis_url:
+                raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
             redis_client = redis.from_url(redis_url)
             
             # Convert plan to JSON string and save to Redis
@@ -371,7 +377,9 @@ async def get_interview_status(session_id: str):
         
         # Retrieve data from Redis
         try:
-            redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+            redis_url = os.environ.get('REDIS_URL')
+            if not redis_url:
+                raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
             redis_client = redis.from_url(redis_url)
             
             # Get the plan
@@ -475,7 +483,9 @@ async def submit_answer(request: SubmitAnswerRequest):
         print(f"🎯 Processing answer for session {request.session_id} using NEW ARCHITECTURE")
         
         # Get Redis connection
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        redis_url = os.environ.get('REDIS_URL')
+        if not redis_url:
+            raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
         redis_client = redis.from_url(redis_url, decode_responses=False)
         
         # A. Fetch the Current State from Redis
@@ -1086,8 +1096,10 @@ def test_celery_task():
 def test_redis():
     """Test endpoint to verify Redis read/write operations"""
     try:
-        # Get Redis URL from environment or use default
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        # Get Redis URL from environment
+        redis_url = os.environ.get('REDIS_URL')
+        if not redis_url:
+            raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
         
         # Create Redis client
         r = redis.from_url(redis_url)
@@ -1156,7 +1168,9 @@ def get_task_status(task_id: str):
     """Get the status of a Celery task"""
     try:
         # Get Redis URL from environment
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        redis_url = os.environ.get('REDIS_URL')
+        if not redis_url:
+            raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
         r = redis.from_url(redis_url)
         
         # Check for task metadata
@@ -1193,7 +1207,9 @@ def get_celery_status():
     """Get general Celery and Redis status"""
     try:
         # Get Redis URL from environment
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        redis_url = os.environ.get('REDIS_URL')
+        if not redis_url:
+            raise ValueError("REDIS_URL environment variable is required. Please set it in Render dashboard.")
         r = redis.from_url(redis_url)
         
         # Check Redis connection
