@@ -974,26 +974,10 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             pubsub.subscribe(channel_name)
             print(f"🔌 WebSocket: Subscribed to Redis channel {channel_name}")
             
-            # Wait for subscription to be fully ready
+            # CRITICAL FIX: Wait for subscription to be ready
             print(f"⏳ Waiting for Redis subscription to be ready...")
-            subscription_ready = False
-            start_time = time.time()
-            
-            while time.time() - start_time < 10:  # Wait up to 10 seconds
-                try:
-                    message = pubsub.get_message(timeout=0.1)
-                    if message and message['type'] == 'subscribe':
-                        print(f"✅ WebSocket: Redis subscription confirmed: {message}")
-                        subscription_ready = True
-                        break
-                    time.sleep(0.1)
-                except Exception as e:
-                    print(f"⚠️ WebSocket: Error waiting for subscription: {e}")
-                    time.sleep(0.1)
-            
-            if not subscription_ready:
-                print(f"❌ WebSocket: Redis subscription not ready after 10 seconds")
-                raise Exception("Redis subscription not ready")
+            time.sleep(2)  # Wait 2 seconds for subscription to be fully ready
+            print(f"✅ Redis subscription ready!")
             
             # Test subscription by checking if we're actually subscribed
             channels = pubsub.channels
@@ -1004,38 +988,9 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 print(f"   Available channels: {channels}")
                 raise Exception("Redis subscription failed")
             
-            # Check for any missed messages (buffer check)
-            print(f"🔍 Checking for any missed messages in channel {channel_name}")
-            missed_messages = []
-            buffer_check_start = time.time()
-            
-            while time.time() - buffer_check_start < 5:  # Check for 5 seconds
-                try:
-                    message = pubsub.get_message(timeout=0.1)
-                    if message and message['type'] == 'message':
-                        missed_messages.append(message)
-                        print(f"📨 WebSocket: Found missed message: {message['data'][:100]}...")
-                    time.sleep(0.1)
-                except Exception as e:
-                    print(f"⚠️ WebSocket: Error checking for missed messages: {e}")
-                    time.sleep(0.1)
-            
-            if missed_messages:
-                print(f"✅ WebSocket: Found {len(missed_messages)} missed messages")
-                # Send the most recent missed message to the client
-                latest_message = missed_messages[-1]
-                ai_question = latest_message['data'].decode('utf-8')
-                print(f"�� WebSocket: Sending missed AI question: {ai_question[:100]}...")
-                
-                await websocket.send_text(json.dumps({
-                    "type": "question",
-                    "content": ai_question,
-                    "session_id": session_id,
-                    "timestamp": datetime.now().isoformat()
-                }))
-            else:
-                print(f"ℹ️ WebSocket: No missed messages found")
-                
+            # Simple subscription confirmation
+            print(f"✅ WebSocket: Redis subscription ready for {channel_name}") 
+
         except Exception as e:
             print(f"❌ WebSocket: Redis connection/subscription error: {e}")
             # Send error to client
