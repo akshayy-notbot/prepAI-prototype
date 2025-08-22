@@ -19,7 +19,7 @@ celery = Celery(
 )
 
 # Create Redis client for synchronous operations
-redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+redis_client = redis.from_url(REDIS_URL, decode_responses=False)
 
 @celery.task
 def orchestrate_next_turn(session_id: str, user_answer: str) -> Dict[str, Any]:
@@ -49,7 +49,7 @@ def orchestrate_next_turn(session_id: str, user_answer: str) -> Dict[str, Any]:
             print(f"❌ {error_msg}")
             return {"error": error_msg}
         
-        plan = json.loads(plan_json)
+        plan = json.loads(plan_json.decode('utf-8') if isinstance(plan_json, bytes) else plan_json)
         print(f"✅ Retrieved interview plan with {len(plan.get('goals', []))} goals")
         
         # Get the conversation history
@@ -59,7 +59,7 @@ def orchestrate_next_turn(session_id: str, user_answer: str) -> Dict[str, Any]:
             print(f"❌ {error_msg}")
             return {"error": error_msg}
         
-        conversation_history = json.loads(history_json)
+        conversation_history = json.loads(history_json.decode('utf-8') if isinstance(history_json, bytes) else history_json)
         print(f"✅ Retrieved conversation history with {len(conversation_history)} turns")
         
         # B. Update the Conversation History
@@ -186,8 +186,26 @@ def orchestrate_next_turn(session_id: str, user_answer: str) -> Dict[str, Any]:
         
         # Publish the new question to the user's channel
         channel_name = f"channel:{session_id}"
-        redis_client.publish(channel_name, new_ai_question)
-        print(f"📢 New question published to channel: {channel_name}")
+        print(f"📢 Attempting to publish to channel: {channel_name}")
+        print(f"📢 Message content: {new_ai_question[:100]}...")
+        
+        # Test Redis connection before publishing
+        try:
+            redis_client.ping()
+            print("✅ Redis connection test successful")
+        except Exception as ping_error:
+            print(f"❌ Redis connection test failed: {ping_error}")
+            return {"error": f"Redis connection failed: {ping_error}"}
+        
+        # Publish the message
+        subscribers = redis_client.publish(channel_name, new_ai_question)
+        print(f"📢 Message published successfully! Subscribers: {subscribers}")
+        
+        # Verify the message was published by checking if it exists
+        if subscribers > 0:
+            print(f"✅ Message confirmed published to {subscribers} subscribers")
+        else:
+            print(f"⚠️ Message published but no subscribers found")
         
         # Return success result
         result = {
