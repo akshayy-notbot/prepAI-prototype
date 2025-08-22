@@ -5,7 +5,7 @@ let questions = [];
 let currentQuestionIndex = 0;
 let transcript = [];
 let interviewConfig = {}; // To store user selections
-let websocket = null; // WebSocket connection for real-time communication
+
 let isWaitingForAI = false; // Track if we're waiting for AI response
 
 // --- Screen & Element References ---
@@ -76,112 +76,7 @@ if (document.readyState === 'loading') {
     validateConfiguration();
 }
 
-// --- WebSocket Functions ---
-function establishWebSocketConnection(sessionId) {
-    console.log('🔌 Establishing WebSocket connection for session:', sessionId);
-    
-    // Close existing connection if any
-    if (websocket) {
-        websocket.close();
-    }
-    
-    // Use the configured WebSocket URL
-    const wsUrl = `${WS_BASE_URL}/ws/${sessionId}`;
-    
-    console.log('🔌 Connecting to WebSocket URL:', wsUrl);
-    
-    // Create real WebSocket connection
-    websocket = new WebSocket(wsUrl);
-    
-    // Add comprehensive error handling
-    websocket.onopen = function(event) {
-        console.log('✅ WebSocket connection opened successfully');
-    };
-    
-    websocket.onerror = function(error) {
-        console.error('❌ WebSocket error:', error);
-        displayErrorMessage('WebSocket connection error. Please refresh the page.');
-    };
-    
-    websocket.onclose = function(event) {
-        console.log('🔌 WebSocket connection closed:', event.code, event.reason);
-        if (event.code !== 1000) { // Not a normal closure
-            displayErrorMessage('Connection lost. Please refresh the page to reconnect.');
-        }
-    };
-    
-    console.log('✅ WebSocket connection created with error handling');
-    return websocket;
-}
 
-// WebSocket message checking (simplified for real WebSocket)
-async function checkForNewMessages(sessionId) {
-    // This function is kept for compatibility but not needed with real WebSockets
-    // The WebSocket onmessage handler will receive messages automatically
-    console.log('🔍 WebSocket message checking not needed with real WebSocket connection');
-}
-
-
-
-
-
-// Cleanup function for WebSocket connections
-function cleanupWebSocket() {
-    if (websocket) {
-        websocket.close();
-        websocket = null;
-    }
-}
-
-function handleWebSocketMessage(message) {
-    console.log('📨 Received WebSocket message:', message);
-    
-    try {
-        // Try to parse as JSON first (for structured messages)
-        const data = typeof message === 'string' ? JSON.parse(message) : message;
-        
-        // Filter out connection and status messages
-        if (data.type === 'connection_status' || data.type === 'status') {
-            console.log('🔌 WebSocket connection message received, ignoring for display');
-            return; // Don't display connection messages
-        }
-        
-        if (data.type === 'question') {
-            // Structured question message
-            handleAIQuestion(data.content || data.message || 'New question received');
-        } else if (data.type === 'error') {
-            // Error message
-            console.error('❌ AI Error:', data.message);
-            displayErrorMessage(data.message || 'An error occurred');
-        } else if (data.type === 'interview_complete') {
-            // Interview completion
-            handleInterviewCompletion(data.message || 'Interview completed successfully!');
-        } else if (data.type === 'message_received') {
-            // Echo message from WebSocket test, ignore
-            console.log('📨 Echo message received, ignoring');
-            return;
-        } else {
-            // Check if this looks like an actual question (not a connection message)
-            const messageText = data.content || data.message || message;
-            if (messageText && !messageText.includes('WebSocket connection established') && 
-                !messageText.includes('connection_status') && messageText.length > 20) {
-                // Likely an actual question
-                handleAIQuestion(messageText);
-            } else {
-                console.log('🔌 Filtered out connection/status message:', messageText);
-            }
-        }
-        
-    } catch (error) {
-        console.log('📨 Treating message as plain text question');
-        // Only treat as question if it's not a connection message
-        if (typeof message === 'string' && !message.includes('WebSocket connection established')) {
-            handleAIQuestion(message);
-        } else {
-            console.log('🔌 Filtered out connection message:', message);
-        }
-    }
-}
 
 // Simplified AI question handler (like your LLM code)
 function handleAIQuestion(questionText) {
@@ -645,9 +540,9 @@ document.getElementById('start-interview-btn').addEventListener('click', startIn
 
 // --- Core API Interaction Logic ---
 // NEW ASYNCHRONOUS FLOW WITH ORCHESTRATOR:
-// 1. startInterview() -> calls /api/start-interview -> establishes WebSocket
-// 2. handleSubmitAnswer() -> calls /api/submit-answer (returns 202 immediately)
-// 3. WebSocket receives AI question -> handleWebSocketMessage() -> displays question
+// 1. startInterview() -> calls /api/start-interview -> gets first question
+// 2. handleSubmitAnswer() -> calls /api/submit-answer -> gets next question immediately
+// 3. Questions are returned directly in API responses
 // 4. Repeat steps 2-3 until interview complete
 // 5. endInterview() -> calls /api/interviews/{id}/complete -> shows analysis
 
@@ -690,56 +585,12 @@ async function startInterview() {
                 console.log('🤖 Displaying first question from API response');
                 displayAIMessage(interviewResponse.first_question);
                 updateQuestionStatus('First question received');
-            } else {
-                console.log('⏳ Waiting for first question via WebSocket...');
-                updateQuestionStatus('Waiting for first question...');
-            }
-            
-            // A. Establish WebSocket Connection
-            const wsConnection = establishWebSocketConnection(sessionId);
-            
-            // B. Set up message handling (real WebSocket)
-            wsConnection.onmessage = (event) => {
-                console.log('📨 Raw WebSocket message received:', event.data);
-                handleWebSocketMessage(event.data);
-            };
-            
-            wsConnection.onopen = (event) => {
-                console.log('🔌 WebSocket connection opened successfully');
-                updateQuestionStatus('Connected to AI interviewer');
-                
-                // If we don't have a first question yet, show waiting status
-                if (!interviewResponse.first_question) {
-                    updateQuestionStatus('Waiting for first question...');
-                }
-            };
-            
-            wsConnection.onclose = (event) => {
-                console.log('🔌 WebSocket connection closed:', event);
-                updateQuestionStatus('Connection lost - reconnecting...');
-                
-                // Simple reconnection logic (like your LLM code)
-                if (event.code !== 1000) { // Not a normal closure
-                    setTimeout(() => {
-                        console.log('🔄 Attempting to reconnect...');
-                        establishWebSocketConnection(sessionId);
-                    }, 3000); // Wait 3 seconds before reconnecting
-                }
-            };
-            
-            wsConnection.onerror = (error) => {
-                console.error('❌ WebSocket error:', error);
-                updateQuestionStatus('Connection error - please refresh');
-            };
-            
-            // Show typing indicator while waiting for first question
-            if (!interviewResponse.first_question) {
-                showInputLoadingState('typing');
-                updateQuestionStatus('AI is preparing your first question...');
-            } else {
-                // First question already received, enable input
                 enableChatInput();
                 updateQuestionStatus('Ready for your answer');
+            } else {
+                console.log('❌ No first question received from API');
+                updateQuestionStatus('Error: No question received');
+                displayErrorMessage('Failed to receive the first question. Please try again.');
             }
             
         } else {
@@ -802,7 +653,7 @@ function hideQuestionLoading() {
 
 function displayCurrentQuestion() {
     // LEGACY: This function is no longer used with the new orchestrator flow
-    // Questions now come via WebSocket from the orchestrator
+                // Questions now come directly from the API responses
     console.log('⚠️ LEGACY: displayCurrentQuestion called - this should not happen with orchestrator flow');
 }
 

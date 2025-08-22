@@ -5,21 +5,18 @@ const CONFIG = {
     // Development Environment
     development: {
         API_BASE_URL: "http://localhost:8000",
-        WS_BASE_URL: "ws://localhost:8000",
         ENVIRONMENT: "development"
     },
     
     // Production Environment (Render)
     production: {
         API_BASE_URL: "https://prepai-api.onrender.com", // Your Render backend URL
-        WS_BASE_URL: "wss://prepai-api.onrender.com",   // Your Render WebSocket URL
         ENVIRONMENT: "production"
     },
     
     // GitHub Pages Environment
     githubPages: {
         API_BASE_URL: "https://prepai-api.onrender.com", // Your Render backend URL
-        WS_BASE_URL: "wss://prepai-api.onrender.com",   // Your Render WebSocket URL
         ENVIRONMENT: "production"
     }
 };

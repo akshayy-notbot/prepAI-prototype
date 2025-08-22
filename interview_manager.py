@@ -52,69 +52,44 @@ def create_interview_plan_with_ai(role: str, seniority: str, skills: List[str]) 
             "status": "failed"
         }
     
-    # Craft the "meta-prompt" for the LLM
-    # This is our instruction manual for creating bespoke interview plans
-    prompt = f"""You are an expert interview strategist at a top tech company. Your job is to create a comprehensive, structured interview plan tailored to a specific role and skill set.
+    # NEW ARCHITECTURE: Lean, Strategic Prompt for Topic Graph Generation
+    prompt = f"""You are a meticulous AI Interview Architect. Your role is to design a structured, machine-readable blueprint for a hyper-realistic interview simulation. You will not generate the questions themselves, but rather the logical flow and key topics for the Persona Agent to use.
 
-**INTERVIEW CONTEXT:**
+**CONTEXT:**
 - Role: {role}
-- Seniority Level: {seniority}
-- Skills to Practice: {', '.join(skills)}
+- Seniority: {seniority}
+- Core Skills to Assess: {', '.join(skills)}
 
-**YOUR TASK:**
-Create a detailed interview plan that will thoroughly assess the candidate's abilities in the selected skills. This plan should be realistic, challenging, and appropriate for the specified seniority level.
+**PRIMARY DIRECTIVE:**
+Generate a topic graph for a single, cohesive interview session. This graph must be structured around a central, realistic case study or project scenario appropriate for the candidate's role and seniority.
 
-**PLAN REQUIREMENTS:**
-1. **Skill Breakdown**: For each selected skill, identify 2-4 specific sub-skills or competencies that should be tested
-2. **Question Strategy**: Determine how many questions/probes are needed for each sub-skill (typically 1-3)
-3. **Difficulty Progression**: Structure questions to progress from foundational to advanced concepts
-4. **Role-Specific Focus**: Ensure questions are relevant to the actual {role} role and {seniority} level
-5. **Interview Flow**: Create a logical sequence that builds upon previous answers
+**DESIGN PRINCIPLES:**
+1.  **Narrative First**: Start by creating a brief, engaging scenario that will serve as the backdrop for the entire interview. This makes the interview feel like a real project discussion, not a random quiz.
+2.  **Topic Granularity**: Break down each primary skill into specific, assessable topics. Each topic should represent a single conversational turn or a small set of related probes.
+3.  **Logical Dependencies**: Structure the topics in a logical sequence. A foundational topic must appear before an advanced one that depends on it.
+4.  **Actionable Keywords**: For each topic, provide a set of concrete keywords. These keywords are the direct input for the Persona Agent to generate its specific questions. They are the bridge between your plan and the live interview.
+5.  **Efficiency**: Your output is a blueprint for another AI. Be concise. Avoid conversational filler and long descriptions.
 
-**OUTPUT FORMAT:**
-Your response MUST be a single, valid JSON object. Do not include any text before or after the JSON. The JSON object must follow this exact schema:
+**OUTPUT SCHEMA:**
+Your response MUST be a single, valid JSON object, enclosed within <JSON_OUTPUT> tags. Adhere strictly to this schema:
 
+<JSON_OUTPUT>
 {{
-  "interview_strategy": {{
-    "overall_approach": "Brief description of the interview strategy and flow",
-    "estimated_duration_minutes": <integer between 15-60>,
-    "difficulty_progression": "beginner|intermediate|advanced|mixed"
-  }},
-  "skill_assessment_plan": [
+  "session_narrative": "A brief, 1-2 sentence project scenario to provide context for the entire interview. (e.g., 'Your team is tasked with designing a new feature for our e-commerce platform to provide personalized recommendations to users.')",
+  "topic_graph": [
     {{
-      "primary_skill": "<skill name from user selection>",
-      "sub_skills": [
-        {{
-          "name": "<specific sub-skill to test>",
-          "description": "<what this sub-skill assesses>",
-          "probes_needed": <integer 1-3>,
-          "difficulty": "beginner|intermediate|advanced",
-          "sample_question_types": ["<type 1>", "<type 2>"]
-        }}
-      ]
+      "topic_id": "<unique_id_string_for_this_topic, e.g., 'PM_01_Problem_Definition'>",
+      "primary_skill": "<The main skill this topic assesses, from the user's list>",
+      "topic_name": "<A short, descriptive name for this topic, e.g., 'Defining User Personas'>",
+      "goal": "<A concise (under 10 words) description of the signal you are trying to capture, e.g., 'Assess structured thinking in problem framing.'>",
+      "dependencies": ["<list of topic_ids that must precede this one, or an empty list []>"],
+      "keywords_for_persona_agent": ["<keyword1>", "<keyword2>", "<keyword3>"]
     }}
-  ],
-  "interviewer_persona": {{
-    "role": "<specific interviewer role>",
-    "company_context": "<company type/context>",
-    "interview_style": "<professional style description>"
-  }},
-  "evaluation_criteria": {{
-    "scoring_framework": "1-5 scale with specific criteria",
-    "key_metrics": ["<metric 1>", "<metric 2>", "<metric 3>"],
-    "success_indicators": ["<indicator 1>", "<indicator 2>"]
-  }}
+  ]
 }}
+</JSON_OUTPUT>
 
-**IMPORTANT GUIDELINES:**
-- Be specific and realistic for the {seniority} {role} level
-- Focus on practical, real-world scenarios they would encounter
-- Ensure questions can be answered in 2-5 minutes each
-- Make the plan challenging but fair for the specified seniority
-- Consider industry best practices for {role} interviews
-- Balance technical skills with soft skills as appropriate for the role
-
-Generate your interview plan now:"""
+Generate the interview blueprint now."""
 
     try:
         # Call the Gemini API
@@ -130,6 +105,12 @@ Generate your interview plan now:"""
         
         response_text = response_text.strip()
         
+        # Extract JSON from <JSON_OUTPUT> tags if present
+        if "<JSON_OUTPUT>" in response_text and "</JSON_OUTPUT>" in response_text:
+            start_tag = response_text.find("<JSON_OUTPUT>") + len("<JSON_OUTPUT>")
+            end_tag = response_text.find("</JSON_OUTPUT>")
+            response_text = response_text[start_tag:end_tag].strip()
+        
         # Parse the JSON response
         ai_generated_plan = json.loads(response_text)
         
@@ -137,42 +118,54 @@ Generate your interview plan now:"""
         if not isinstance(ai_generated_plan, dict):
             raise ValueError("Response is not a valid JSON object")
         
-        if "skill_assessment_plan" not in ai_generated_plan:
-            raise ValueError("Response missing required skill_assessment_plan field")
+        if "topic_graph" not in ai_generated_plan:
+            raise ValueError("Response missing required topic_graph field")
         
-        # Transform AI response into our standardized format
+        # Extract the topic graph and session narrative
+        topic_graph = ai_generated_plan.get("topic_graph", [])
+        session_narrative = ai_generated_plan.get("session_narrative", "")
+        
+        # Transform topic graph into our standardized format
         goals = []
-        for skill_section in ai_generated_plan.get("skill_assessment_plan", []):
-            primary_skill = skill_section.get("primary_skill", "Unknown Skill")
-            for sub_skill in skill_section.get("sub_skills", []):
-                goals.append({
-                    "skill": f"{primary_skill}: {sub_skill.get('name', 'Unknown')}",
-                    "sub_skill": sub_skill.get('name', 'Unknown'),
-                    "description": sub_skill.get('description', ''),
-                    "status": "pending",
-                    "probes_needed": sub_skill.get('probes_needed', 1),
-                    "difficulty": sub_skill.get('difficulty', 'intermediate'),
-                    "sample_question_types": sub_skill.get('sample_question_types', [])
-                })
+        for topic in topic_graph:
+            goals.append({
+                "topic_id": topic.get("topic_id", f"topic_{len(goals)}"),
+                "skill": topic.get("primary_skill", "Unknown Skill"),
+                "topic_name": topic.get("topic_name", "Unknown Topic"),
+                "description": topic.get("goal", ""),
+                "status": "pending",
+                "dependencies": topic.get("dependencies", []),
+                "keywords": topic.get("keywords_for_persona_agent", []),
+                "probes_needed": 1,  # Default to 1 probe per topic
+                "difficulty": "intermediate"  # Default difficulty
+            })
         
-        # Assemble the final interview plan
+        # Assemble the final interview plan with new architecture
         interview_plan = {
             "session_id": session_id,
-            "persona": ai_generated_plan.get("interviewer_persona", {}).get("role", f"{seniority} {role}"),
+            "persona": f"{seniority} {role} Interviewer",  # Default persona
             "role": role,
             "seniority": seniority,
             "skills": skills,
             "goals": goals,
             "start_time": start_time.isoformat(),
-            "status": "planned",
+            "status": "ready",  # New status for new architecture
             "total_goals": len(goals),
             "completed_goals": 0,
-            "estimated_duration_minutes": ai_generated_plan.get("interview_strategy", {}).get("estimated_duration_minutes", len(goals) * 3),
+            "estimated_duration_minutes": len(goals) * 3,  # 3 minutes per topic
+            
+            # NEW ARCHITECTURE: Topic Graph Data
+            "topic_graph": topic_graph,
+            "session_narrative": session_narrative,
+            "current_topic_id": goals[0]["topic_id"] if goals else None,
+            "covered_topic_ids": [],
+            
+            # Legacy metadata for backward compatibility
             "ai_generated_metadata": {
-                "overall_approach": ai_generated_plan.get("interview_strategy", {}).get("overall_approach", ""),
-                "difficulty_progression": ai_generated_plan.get("interview_strategy", {}).get("difficulty_progression", "mixed"),
-                "evaluation_criteria": ai_generated_plan.get("evaluation_criteria", {}),
-                "interviewer_context": ai_generated_plan.get("interviewer_persona", {})
+                "overall_approach": f"Structured interview with {len(goals)} topics",
+                "difficulty_progression": "mixed",
+                "evaluation_criteria": {},
+                "interviewer_context": {"role": f"{seniority} {role}"}
             }
         }
         
@@ -247,7 +240,8 @@ def get_plan_summary(interview_plan: Dict[str, Any]) -> Dict[str, Any]:
         if primary_skill not in goals_by_skill:
             goals_by_skill[primary_skill] = []
         goals_by_skill[primary_skill].append({
-            "sub_skill": goal.get("sub_skill", ""),
+            "topic_id": goal.get("topic_id", ""),
+            "topic_name": goal.get("topic_name", ""),
             "difficulty": goal.get("difficulty", ""),
             "probes_needed": goal.get("probes_needed", 1),
             "status": goal.get("status", "pending")
@@ -263,5 +257,7 @@ def get_plan_summary(interview_plan: Dict[str, Any]) -> Dict[str, Any]:
         "estimated_duration": interview_plan.get("estimated_duration_minutes", 0),
         "status": interview_plan.get("status"),
         "skills_breakdown": goals_by_skill,
-        "overall_approach": interview_plan.get("ai_generated_metadata", {}).get("overall_approach", "")
+        "session_narrative": interview_plan.get("session_narrative", ""),
+        "current_topic_id": interview_plan.get("current_topic_id"),
+        "covered_topic_ids": interview_plan.get("covered_topic_ids", [])
     }

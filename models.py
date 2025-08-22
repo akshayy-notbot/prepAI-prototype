@@ -1,9 +1,10 @@
-from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, JSON, DateTime, Text, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, JSON, DateTime, Text, Boolean, UUID
 from sqlalchemy.dialects.postgresql import JSONB 
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import os
+import uuid
 
 # Use the DATABASE_URL from the environment, with a local default
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://prepaiuser:prepaipassword@localhost/prepaidb")
@@ -11,28 +12,37 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- Enhanced Table Definitions ---
+# --- Enhanced Table Definitions for New Architecture ---
 
 class InterviewSession(Base):
     """
-    Stores complete interview sessions with metadata, questions, responses, and analysis
+    Stores complete interview sessions with the new topic_graph architecture.
+    Note: Real-time state is managed in Redis, not in this table.
     """
     __tablename__ = "interview_sessions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, index=True, default=1)  # For now, using dummy user ID
     session_id = Column(String, unique=True, index=True)  # Frontend-generated session ID
+    user_id = Column(Integer, index=True, default=1)  # For now, using dummy user ID
     
     # Interview Configuration
     role = Column(String, nullable=False)
     seniority = Column(String, nullable=False)
     selected_skills = Column(JSONB, nullable=False)  # Array of selected skills
     
+    # New Architecture: Topic Graph (Permanent Blueprint)
+    topic_graph = Column(JSONB, nullable=False)  # The machine-readable interview blueprint
+    session_narrative = Column(Text)  # The project scenario backdrop
+    
     # Session Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
     started_at = Column(DateTime)
     completed_at = Column(DateTime)
-    status = Column(String, default='in-progress')  # in-progress, completed, analyzed
+    status = Column(String, default='ready')  # ready, in_progress, completed, analyzed
+    
+    # Final State (Persisted after interview ends, not during real-time)
+    final_current_topic_id = Column(String)  # Final topic when interview ended
+    final_covered_topic_ids = Column(JSONB)  # Final array of completed topic IDs
     
     # Generated Questions (stored as JSON)
     generated_questions = Column(JSONB)  # Full question objects from Gemini API
@@ -50,6 +60,120 @@ class InterviewSession(Base):
     
     def __repr__(self):
         return f"<InterviewSession(id={self.id}, role={self.role}, status={self.status})>"
+
+class SessionState(Base):
+    """
+    Final session state for completed interviews (persisted after completion).
+    Real-time state during interviews lives in Redis only.
+    """
+    __tablename__ = "session_states"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, unique=True, index=True)
+    
+    # Final State (from Redis when interview ended)
+    final_current_topic_id = Column(String, nullable=False)
+    final_covered_topic_ids = Column(JSONB, default=list)  # Array of completed topic IDs
+    
+    # Final Conversation State
+    final_conversation_history = Column(JSONB)  # Complete conversation history
+    final_topic_progress = Column(JSONB)  # Final progress tracking for each topic
+    
+    # Performance Tracking (aggregated from Redis)
+    total_router_agent_calls = Column(Integer, default=0)
+    total_generator_agent_calls = Column(Integer, default=0)
+    total_response_time_ms = Column(Integer, default=0)
+    
+    # Timestamps
+    interview_completed_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<SessionState(session_id={self.session_id}, final_topic={self.final_current_topic_id})>"
+
+class TopicGraph(Base):
+    """
+    Stores reusable topic graphs for different role/seniority combinations
+    """
+    __tablename__ = "topic_graphs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    graph_id = Column(String, unique=True, index=True)
+    
+    # Graph Configuration
+    role = Column(String, nullable=False)
+    seniority = Column(String, nullable=False)
+    skills = Column(JSONB, nullable=False)  # Array of skills this graph covers
+    
+    # Graph Content
+    session_narrative = Column(Text, nullable=False)
+    topic_graph = Column(JSONB, nullable=False)  # The structured topic blueprint
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    usage_count = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    
+    def __repr__(self):
+        return f"<TopicGraph(id={self.graph_id}, role={self.role}, seniority={self.seniority})>"
+
+class AnalysisOrchestrator(Base):
+    """
+    Coordinates post-interview analysis across multiple specialist agents
+    """
+    __tablename__ = "analysis_orchestrators"
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, unique=True, index=True)
+    
+    # Analysis Coordination
+    analysis_status = Column(String, default='pending')  # pending, in_progress, completed, failed
+    specialist_agents = Column(JSONB)  # Array of agent configurations and results
+    
+    # Analysis Results
+    overall_analysis = Column(JSONB)  # Aggregated results from all agents
+    individual_agent_results = Column(JSONB)  # Results from each specialist agent
+    
+    # Performance Metrics
+    total_analysis_time_ms = Column(Integer)
+    agent_execution_times = Column(JSONB)  # Timing for each specialist agent
+    
+    # Timestamps
+    analysis_started_at = Column(DateTime)
+    analysis_completed_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<AnalysisOrchestrator(session_id={self.session_id}, status={self.analysis_status})>"
+
+class SpecialistAgent(Base):
+    """
+    Individual specialist agents for post-interview analysis
+    """
+    __tablename__ = "specialist_agents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    agent_type = Column(String, nullable=False)  # technical, communication, problem_solving, strategic
+    session_id = Column(String, index=True)
+    
+    # Agent Configuration
+    agent_config = Column(JSONB)  # Agent-specific configuration
+    analysis_prompt = Column(Text)  # The prompt used for this agent
+    
+    # Analysis Results
+    analysis_result = Column(JSONB)  # Agent's analysis output
+    confidence_score = Column(Integer)  # Agent's confidence in its analysis
+    
+    # Performance
+    execution_time_ms = Column(Integer)
+    tokens_used = Column(Integer)
+    
+    # Timestamps
+    executed_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<SpecialistAgent(type={self.agent_type}, session_id={self.session_id})>"
 
 class UserResponse(Base):
     """
@@ -69,6 +193,10 @@ class UserResponse(Base):
     user_answer = Column(Text, nullable=False)
     response_length = Column(Integer)  # Character count
     response_time = Column(Integer)  # Time taken to respond in seconds
+    
+    # New Architecture: Topic Tracking
+    topic_id = Column(String)  # Which topic this response addresses
+    goal_achieved = Column(Boolean)  # Whether the topic goal was met
     
     # Timestamps
     question_asked_at = Column(DateTime)
@@ -102,6 +230,10 @@ class AnalysisResult(Base):
     areas_for_improvement = Column(JSONB)  # Array of improvement areas
     recommendations = Column(JSONB)  # Array of recommendations
     
+    # New Architecture: Topic-Based Analysis
+    topic_performance = Column(JSONB)  # Performance breakdown by topic
+    skill_gaps = Column(JSONB)  # Identified skill gaps by topic
+    
     # Raw analysis data
     raw_analysis = Column(JSONB)  # Complete response from Gemini API
     
@@ -123,13 +255,17 @@ class SkillPerformance(Base):
     questions_answered = Column(Integer, default=0)
     improvement_needed = Column(Boolean, default=False)
     
+    # New Architecture: Topic-Based Tracking
+    topic_id = Column(String)  # Which topic this skill was assessed in
+    goal_achievement = Column(Boolean)  # Whether the topic goal was met
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):
         return f"<SkillPerformance(skill={self.skill_name}, score={self.skill_score})>"
 
-# Legacy tables (keeping for backward compatibility)
+# Legacy tables (keeping for backward compatibility during transition)
 class Interview(Base):
     __tablename__ = "interviews"
 

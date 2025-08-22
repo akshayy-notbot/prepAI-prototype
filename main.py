@@ -2,7 +2,6 @@ import os
 import json
 from typing import List, Dict, Any
 from datetime import datetime
-import time
 
 # Load environment variables from .env file if it exists
 from dotenv import load_dotenv
@@ -10,7 +9,6 @@ load_dotenv()
 
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -21,15 +19,13 @@ import redis
 
 # Import our new AI-powered interview components
 from agents.interview_manager import create_interview_plan
-from agents.persona import generate_ai_question
+from agents.persona import PersonaAgent
 
 # Import agent functions directly (no more Celery!)
 from agents.interview_manager import create_interview_plan
 from agents.evaluation import evaluate_answer
-from agents.persona import generate_ai_question
 
-# WebSocket connection manager
-active_connections: list[WebSocket] = []
+
 
 # --- FastAPI App Initialization ---
 app = FastAPI()
@@ -222,15 +218,14 @@ def create_interview(interview_data: InterviewCreate, db: Session = Depends(get_
 
     return {"interview_id": new_interview.id, "questions": questions_from_db}
 
-
 @app.post("/api/start-interview")
 async def start_interview(request: StartInterviewRequest):
     """
-    Starts a new AI-powered interview session.
+    NEW ARCHITECTURE: Starts a new AI-powered interview session with topic_graph.
     Creates an interview plan, generates the first question, and saves everything to Redis.
     """
     try:
-        # Step 1: Call the Plan Creator
+        # Step 1: Call the Plan Creator (NEW: Generates topic_graph)
         print(f"🚀 Starting interview for {request.role} at {request.seniority} level")
         print(f"📚 Skills to practice: {', '.join(request.skills)}")
         
@@ -248,7 +243,17 @@ async def start_interview(request: StartInterviewRequest):
         session_id = plan["session_id"]
         print(f"✅ Interview plan created successfully. Session ID: {session_id}")
         
-        # Step 2: Save the Plan to Redis
+        # NEW: Extract topic_graph and session_narrative
+        topic_graph = plan.get("topic_graph", [])
+        session_narrative = plan.get("session_narrative", "")
+        
+        if not topic_graph:
+            return {"error": "Failed to generate topic graph for interview"}, 500
+        
+        print(f"📊 Topic graph generated with {len(topic_graph)} topics")
+        print(f"📖 Session narrative: {session_narrative[:100]}...")
+        
+        # Step 2: Save the Plan to Redis (NEW: Includes topic_graph)
         try:
             redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
             redis_client = redis.from_url(redis_url)
@@ -256,24 +261,48 @@ async def start_interview(request: StartInterviewRequest):
             # Convert plan to JSON string and save to Redis
             plan_json = json.dumps(plan)
             redis_client.set(f"plan:{session_id}", plan_json, ex=3600)  # Expire in 1 hour
-            print(f"✅ Interview plan saved to Redis with key: plan:{session_id}")
+            
+            # NEW: Save topic_graph separately for fast access
+            topic_graph_json = json.dumps(topic_graph)
+            redis_client.set(f"topic_graph:{session_id}", topic_graph_json, ex=3600)
+            
+            # NEW: Save session narrative separately
+            redis_client.set(f"narrative:{session_id}", session_narrative, ex=3600)
+            
+            print(f"✅ Interview plan and topic_graph saved to Redis with key: plan:{session_id}")
             
         except Exception as redis_error:
             print(f"❌ Failed to save plan to Redis: {redis_error}")
             return {"error": f"Failed to save interview plan: {str(redis_error)}"}, 500
         
-        # Step 3: Generate the First Question
-        print("🎭 Generating first interview question...")
+        # Step 3: Generate the First Question (NEW: Using PersonaAgent)
+        print("🎭 Generating first interview question using new PersonaAgent...")
         
         # Create interviewer persona from the plan
         interviewer_persona = plan.get("persona", f"{request.seniority} {request.role}")
         
-        # Generate the opening question
-        first_question = generate_ai_question(
-            persona=interviewer_persona,
-            instructions="Start the interview with a welcoming introduction and ask the first question that will assess the candidate's abilities. Be professional but friendly, and make the candidate feel comfortable while setting clear expectations for the interview.",
-            history=[]
-        )
+        # NEW: Use PersonaAgent for first question
+        try:
+            persona_agent = PersonaAgent()
+            
+            # Initialize session state and get first question
+            first_question_result = persona_agent.process_user_response(
+                session_id=session_id,
+                user_answer="",  # No user answer for first question
+                topic_graph=topic_graph,
+                session_narrative=session_narrative,
+                interviewer_persona=interviewer_persona
+            )
+            
+            if not first_question_result.get("success", False):
+                raise Exception(f"PersonaAgent failed: {first_question_result.get('error', 'Unknown error')}")
+            
+            first_question = first_question_result["response_text"]
+            print(f"✅ First question generated using PersonaAgent: {first_question[:100]}...")
+            
+        except Exception as persona_error:
+            print(f"❌ PersonaAgent failed: {persona_error}")
+            return {"error": f"Failed to generate first question: {persona_error}"}, 500
         
         # Check if question generation failed
         if first_question.startswith("Error:"):
@@ -302,7 +331,7 @@ async def start_interview(request: StartInterviewRequest):
             print(f"❌ Failed to save history to Redis: {redis_error}")
             return {"error": f"Failed to save interview history: {str(redis_error)}"}, 500
         
-        # Step 5: Return the Response
+        # Step 5: Return the Response (NEW: Includes topic_graph info)
         response_data = {
             "session_id": session_id,
             "first_question": first_question,
@@ -310,12 +339,20 @@ async def start_interview(request: StartInterviewRequest):
             "total_goals": plan["total_goals"],
             "estimated_duration_minutes": plan["estimated_duration_minutes"],
             "skills_breakdown": plan.get("ai_generated_metadata", {}).get("overall_approach", ""),
-            "status": "started"
+            "status": "started",
+            
+            # NEW: Topic Graph Information
+            "topic_graph_summary": {
+                "total_topics": len(topic_graph),
+                "session_narrative": session_narrative,
+                "first_topic": topic_graph[0] if topic_graph else None
+            }
         }
         
         print(f"🎯 Interview session {session_id} started successfully!")
         print(f"📊 Total goals: {plan['total_goals']}")
         print(f"⏱️ Estimated duration: {plan['estimated_duration_minutes']} minutes")
+        print(f"📋 Topic graph: {len(topic_graph)} topics ready")
         
         return response_data
         
@@ -323,106 +360,11 @@ async def start_interview(request: StartInterviewRequest):
         print(f"❌ Unexpected error in start_interview: {e}")
         return {"error": f"Unexpected error: {str(e)}"}, 500
 
-
-# Old next-question endpoint removed - replaced by synchronous submit-answer!
-# async def get_next_question(session_id: str, request: Dict[str, Any]):
-    """
-    Gets the next question for an ongoing interview session.
-    Takes the candidate's answer and generates the next appropriate question.
-    """
-    try:
-        candidate_answer = request.get("answer", "")
-        if not candidate_answer:
-            return {"error": "Candidate answer is required"}, 400
-        
-        print(f"🔄 Getting next question for session {session_id}")
-        print(f"📝 Candidate answer: {candidate_answer[:100]}...")
-        
-        # Step 1: Retrieve the interview plan and history from Redis
-        try:
-            redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-            redis_client = redis.from_url(redis_url)
-            
-            # Get the plan
-            plan_json = redis_client.get(f"plan:{session_id}")
-            if not plan_json:
-                return {"error": "Interview plan not found. Session may have expired."}, 404
-            
-            plan = json.loads(plan_json.decode('utf-8'))
-            
-            # Get the history
-            history_json = redis_client.get(f"history:{session_id}")
-            if not history_json:
-                return {"error": "Interview history not found. Session may have expired."}, 404
-            
-            interview_history = json.loads(history_json.decode('utf-8'))
-            
-        except Exception as redis_error:
-            print(f"❌ Failed to retrieve data from Redis: {redis_error}")
-            return {"error": f"Failed to retrieve interview data: {str(redis_error)}"}, 500
-        
-        # Step 2: Update the history with the candidate's answer
-        if interview_history and len(interview_history) > 0:
-            # Update the last question with the answer
-            interview_history[-1]["answer"] = candidate_answer
-            interview_history[-1]["answered_at"] = datetime.utcnow().isoformat()
-        
-        # Step 3: Generate the next question
-        interviewer_persona = plan.get("persona", "AI Interviewer")
-        
-        # Determine what type of question to ask next based on the plan
-        next_question_instructions = "Ask the next question that will assess the candidate's abilities. Build upon their previous answer and progress through the interview plan. Be engaging and professional."
-        
-        next_question = generate_ai_question(
-            persona=interviewer_persona,
-            instructions=next_question_instructions,
-            history=interview_history
-        )
-        
-        if next_question.startswith("Error:"):
-            print(f"❌ Failed to generate next question: {next_question}")
-            return {"error": f"Failed to generate next question: {next_question}"}, 500
-        
-        # Step 4: Add the new question to history
-        interview_history.append({
-            "question": next_question,
-            "answer": None,
-            "timestamp": datetime.utcnow().isoformat(),
-            "question_type": "follow_up"
-        })
-        
-        # Step 5: Save updated history to Redis
-        try:
-            updated_history_json = json.dumps(interview_history)
-            redis_client.set(f"history:{session_id}", updated_history_json, ex=3600)
-            print(f"✅ Updated interview history saved to Redis")
-            
-        except Exception as redis_error:
-            print(f"❌ Failed to save updated history to Redis: {redis_error}")
-            return {"error": f"Failed to save interview history: {str(redis_error)}"}, 500
-        
-        # Step 6: Return the next question
-        response_data = {
-            "session_id": session_id,
-            "next_question": next_question,
-            "question_number": len(interview_history),
-            "total_questions_asked": len(interview_history),
-            "status": "question_generated"
-        }
-        
-        print(f"✅ Next question generated successfully for session {session_id}")
-        return response_data
-        
-    except Exception as e:
-        print(f"❌ Unexpected error in get_next_question: {e}")
-        return {"error": f"Unexpected error: {str(e)}"}, 500
-
-
 @app.get("/api/interview/{session_id}/status")
 async def get_interview_status(session_id: str):
     """
     Gets the current status and plan for an interview session.
-    Useful for resuming interviews or checking progress.
+    Updated to include topic_graph information.
     """
     try:
         print(f"📊 Getting status for interview session {session_id}")
@@ -446,6 +388,13 @@ async def get_interview_status(session_id: str):
             
             interview_history = json.loads(history_json.decode('utf-8'))
             
+            # NEW: Get topic_graph and session narrative
+            topic_graph_json = redis_client.get(f"topic_graph:{session_id}")
+            topic_graph = json.loads(topic_graph_json.decode('utf-8')) if topic_graph_json else []
+            
+            narrative = redis_client.get(f"narrative:{session_id}")
+            session_narrative = narrative.decode('utf-8') if narrative else ""
+            
         except Exception as redis_error:
             print(f"❌ Failed to retrieve data from Redis: {redis_error}")
             return {"error": f"Failed to retrieve interview data: {str(redis_error)}"}, 500
@@ -463,6 +412,10 @@ async def get_interview_status(session_id: str):
                     current_question = qa.get("question")
                     break
         
+        # NEW: Get current topic information
+        current_topic_id = plan.get("current_topic_id", "")
+        covered_topic_ids = plan.get("covered_topic_ids", [])
+        
         # Prepare response
         status_data = {
             "session_id": session_id,
@@ -478,11 +431,29 @@ async def get_interview_status(session_id: str):
             "questions_answered": len([qa for qa in interview_history if qa.get("answer") is not None]),
             "status": plan.get("status", "in_progress"),
             "start_time": plan.get("start_time"),
-            "skills_breakdown": plan.get("ai_generated_metadata", {}).get("overall_approach", "")
+            "skills_breakdown": plan.get("ai_generated_metadata", {}).get("overall_approach", ""),
+            
+            # NEW: Topic Graph Information
+            "topic_graph": {
+                "total_topics": len(topic_graph),
+                "current_topic_id": current_topic_id,
+                "covered_topic_ids": covered_topic_ids,
+                "session_narrative": session_narrative,
+                "next_topic": None
+            }
         }
+        
+        # Find next topic
+        if topic_graph and current_topic_id:
+            for topic in topic_graph:
+                if (topic["topic_id"] not in covered_topic_ids and 
+                    topic["topic_id"] != current_topic_id):
+                    status_data["topic_graph"]["next_topic"] = topic
+                    break
         
         print(f"✅ Interview status retrieved successfully for session {session_id}")
         print(f"📈 Progress: {completed_goals}/{total_goals} goals completed ({progress_percentage:.1f}%)")
+        print(f"📋 Current topic: {current_topic_id}")
         
         return status_data
         
@@ -490,19 +461,18 @@ async def get_interview_status(session_id: str):
         print(f"❌ Unexpected error in get_interview_status: {e}")
         return {"error": f"Unexpected error: {str(e)}"}, 500
 
-
 @app.post("/api/submit-answer")
 async def submit_answer(request: SubmitAnswerRequest):
     """
-    Receives an answer from the user, processes it synchronously,
-    and returns the next AI question immediately.
+    NEW ARCHITECTURE: Receives an answer from the user and processes it using the new PersonaAgent system.
+    This is the core of the new two-loop architecture.
     """
     # Validation
     if not request.session_id or not request.answer:
         raise HTTPException(status_code=400, detail="session_id and answer are required.")
     
     try:
-        print(f"🎯 Processing answer for session {request.session_id}")
+        print(f"🎯 Processing answer for session {request.session_id} using NEW ARCHITECTURE")
         
         # Get Redis connection
         redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
@@ -518,6 +488,18 @@ async def submit_answer(request: SubmitAnswerRequest):
         
         plan = json.loads(plan_json.decode('utf-8') if isinstance(plan_json, bytes) else plan_json)
         print(f"✅ Retrieved interview plan with {len(plan.get('goals', []))} goals")
+        
+        # Get the topic_graph and session_narrative
+        topic_graph_json = redis_client.get(f"topic_graph:{request.session_id}")
+        if not topic_graph_json:
+            raise HTTPException(status_code=404, detail="Topic graph not found. Session may have expired.")
+        
+        topic_graph = json.loads(topic_graph_json.decode('utf-8') if isinstance(topic_graph_json, bytes) else topic_graph_json)
+        print(f"✅ Retrieved topic graph with {len(topic_graph)} topics")
+        
+        narrative = redis_client.get(f"narrative:{request.session_id}")
+        session_narrative = narrative.decode('utf-8') if narrative else ""
+        print(f"✅ Retrieved session narrative: {session_narrative[:50]}...")
         
         # Get the conversation history
         history_json = redis_client.get(f"history:{request.session_id}")
@@ -538,87 +520,95 @@ async def submit_answer(request: SubmitAnswerRequest):
         last_turn["answer"] = request.answer
         print(f"✅ Updated last turn with user's answer: {request.answer[:50]}...")
         
-        # C. Call the Evaluation Agent
-        print("🔍 Calling evaluation agent...")
+        # C. NEW ARCHITECTURE: Use PersonaAgent for Response Generation
+        print("🎭 Using NEW PersonaAgent system for response generation...")
         
-        # Get the current goal from the plan
-        current_goal = None
-        for goal in plan.get("goals", []):
-            if goal.get("status") == "pending":
-                current_goal = goal
-                break
-        
-        if not current_goal:
-            raise HTTPException(status_code=400, detail="No pending goals found in interview plan")
-        
-        # Get the last question for context
-        last_question = last_turn.get("question", "")
-        
-        # Evaluate the user's answer
-        skills_to_assess = [current_goal.get("skill", "General")]
-        evaluation_result = evaluate_answer(
-            answer=request.answer,
-            question=last_question,
-            skills_to_assess=skills_to_assess
-        )
-        
-        if not evaluation_result:
-            raise HTTPException(status_code=500, detail="Failed to evaluate answer")
-        
-        print(f"✅ Evaluation completed with overall score: {evaluation_result.get('overall_score', 'N/A')}")
-        
-        # D. Update Interview Plan Based on Evaluation
-        print("📊 Updating interview plan based on evaluation...")
-        
-        # Simple goal processing logic
-        if current_goal:
-            score = evaluation_result.get("scores", {}).get(current_goal["skill"], {}).get("score", 0)
-            if score >= 3:  # Consider a score of 3+ a successful probe
-                current_goal["probes_needed"] -= 1
-                print(f"✅ Decremented probes for {current_goal['skill']}: {current_goal['probes_needed'] + 1} -> {current_goal['probes_needed']}")
-                
-                if current_goal["probes_needed"] <= 0:
-                    current_goal["status"] = "covered"
-                    print(f"🎯 Goal '{current_goal['skill']}' marked as covered")
-        
-        # E. Determine the Next Action
-        print("🎯 Determining next action...")
-        
-        # Simple goal determination logic
-        next_goal = next((g for g in plan.get("goals", []) if g.get("status") == "pending"), None)
-        
-        if not next_goal:
-            # All goals are covered, interview is complete
-            print("🎉 All interview goals have been covered!")
-            new_ai_question = "Thank you, that concludes our interview. We will be in touch regarding the next steps."
-        else:
-            skill_name = next_goal.get("skill", "the required skills")
-            instruction = f"The current goal is to assess '{skill_name}'. Ask a question related to this skill, considering the conversation history."
-            print(f"🎯 Next target: {skill_name}")
-        
-        # F. Call the Persona Agent
-        print("🎭 Generating next question with persona agent...")
-        
-        if not next_goal:
-            # Interview is complete, question already set
-            print("✅ Interview complete, using final message")
-        else:
-            # Generate question for pending goal
-            persona = plan.get("persona", "Professional Interviewer")
-            new_ai_question = generate_ai_question(
-                persona=persona,
-                instructions=instruction,
-                history=conversation_history
+        try:
+            persona_agent = PersonaAgent()
+            
+            # Process the user response using the new two-prompt system
+            persona_result = persona_agent.process_user_response(
+                session_id=request.session_id,
+                user_answer=request.answer,
+                topic_graph=topic_graph,
+                session_narrative=session_narrative,
+                interviewer_persona=plan.get("persona", "Professional Interviewer")
             )
             
-            if new_ai_question.startswith("Error:"):
-                print(f"❌ Failed to generate question: {new_ai_question}")
-                # Fallback question
-                new_ai_question = f"Could you please elaborate on your experience with {skill_name}?"
+            if not persona_result.get("success", False):
+                raise Exception(f"PersonaAgent failed: {persona_result.get('error', 'Unknown error')}")
             
-            print(f"✅ Generated new question: {new_ai_question[:100]}...")
+            new_ai_question = persona_result["response_text"]
+            agent_used = persona_result.get("agent_used", "unknown")
+            router_analysis = persona_result.get("router_analysis", {})
+            current_topic_id = persona_result.get("current_topic_id", "")
+            covered_topic_ids = persona_result.get("covered_topic_ids", [])
+            
+            print(f"✅ PersonaAgent generated response using {agent_used} agent")
+            print(f"📊 Router analysis: {router_analysis.get('next_action', 'unknown')}")
+            print(f"🎯 Current topic: {current_topic_id}")
+            
+        except Exception as persona_error:
+            print(f"❌ PersonaAgent failed, falling back to legacy method: {persona_error}")
+            
+            # Fallback to legacy evaluation and question generation
+            current_goal = None
+            for goal in plan.get("goals", []):
+                if goal.get("status") == "pending":
+                    current_goal = goal
+                    break
+            
+            if not current_goal:
+                raise HTTPException(status_code=400, detail="No pending goals found in interview plan")
+            
+            # Get the last question for context
+            last_question = last_turn.get("question", "")
+            
+            # Evaluate the user's answer
+            skills_to_assess = [current_goal.get("skill", "General")]
+            evaluation_result = evaluate_answer(
+                answer=request.answer,
+                question=last_question,
+                skills_to_assess=skills_to_assess
+            )
+            
+            if not evaluation_result:
+                raise HTTPException(status_code=500, detail="Failed to evaluate answer")
+            
+            print(f"✅ Legacy evaluation completed with overall score: {evaluation_result.get('overall_score', 'N/A')}")
+            
+            # Simple goal processing logic
+            if current_goal:
+                score = evaluation_result.get("scores", {}).get(current_goal["skill"], {}).get("score", 0)
+                if score >= 3:  # Consider a score of 3+ a successful probe
+                    current_goal["probes_needed"] -= 1
+                    print(f"✅ Decremented probes for {current_goal['skill']}: {current_goal['probes_needed'] + 1} -> {current_goal['probes_needed']}")
+                    
+                    if current_goal["probes_needed"] <= 0:
+                        current_goal["status"] = "covered"
+                        print(f"🎯 Goal '{current_goal['skill']}' marked as covered")
+            
+            # Determine the Next Action
+            next_goal = next((g for g in plan.get("goals", []) if g.get("status") == "pending"), None)
+            
+            if not next_goal:
+                # All goals are covered, interview is complete
+                print("🎉 All interview goals have been covered!")
+                new_ai_question = "Thank you, that concludes our interview. We will be in touch regarding the next steps."
+                agent_used = "legacy_fallback"
+                current_topic_id = "completed"
+                covered_topic_ids = [g["skill"] for g in plan.get("goals", [])]
+            else:
+                skill_name = next_goal.get("skill", "the required skills")
+                instruction = f"The current goal is to assess '{skill_name}'. Ask a question related to this skill, considering the conversation history."
+                print(f"🎯 Next target: {skill_name}")
+                
+                # This should not happen with the new architecture
+                # If we reach here, it means the new architecture failed
+                print(f"❌ New architecture failed, cannot generate question for skill: {skill_name}")
+                return {"error": f"Failed to generate question using new architecture. Please restart the interview."}, 500
         
-        # G. Save State and Return the New Question
+        # D. Save State and Return the New Question
         print("💾 Saving updated state to Redis...")
         
         # Append new turn to history
@@ -630,7 +620,14 @@ async def submit_answer(request: SubmitAnswerRequest):
         }
         conversation_history.append(new_turn)
         
-        # Save updated plan and history back to Redis
+        # Update plan with new topic information if using new architecture
+        if "current_topic_id" in locals() and current_topic_id:
+            # Only update the plan object in memory for Redis storage
+            # Do NOT write to PostgreSQL during real-time interview
+            plan["current_topic_id"] = current_topic_id
+            plan["covered_topic_ids"] = covered_topic_ids
+        
+        # Save updated plan and history back to Redis (ONLY Redis during interview)
         updated_plan_json = json.dumps(plan)
         updated_history_json = json.dumps(conversation_history)
         
@@ -638,6 +635,7 @@ async def submit_answer(request: SubmitAnswerRequest):
         redis_client.set(f"history:{request.session_id}", updated_history_json, ex=3600)
         
         print("✅ Updated plan and history saved to Redis")
+        print("ℹ️ Note: Session state remains in Redis only during interview")
         
         # Return the new question immediately
         result = {
@@ -647,18 +645,36 @@ async def submit_answer(request: SubmitAnswerRequest):
             "session_id": request.session_id,
             "goals_remaining": len([g for g in plan.get("goals", []) if g.get("status") == "pending"]),
             "total_goals": len(plan.get("goals", [])),
-            "evaluation_score": evaluation_result.get("overall_score", "N/A"),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            
+            # NEW: Architecture Information
+            "architecture": "new_two_loop" if "router_analysis" in locals() else "legacy_fallback",
+            "agent_used": agent_used,
+            "current_topic_id": current_topic_id if "current_topic_id" in locals() else "",
+            "covered_topic_ids": covered_topic_ids if "covered_topic_ids" in locals() else [],
+            
+            # NEW: State Management Information
+            "state_storage": "redis_only",  # All real-time state stays in Redis
+            "postgresql_write": "none"  # No database writes during interview
         }
         
+        # Add router analysis if available
+        if "router_analysis" in locals():
+            result["router_analysis"] = router_analysis
+            result["total_latency_ms"] = persona_result.get("total_latency_ms", 0)
+            result["agent_latency_ms"] = persona_result.get("agent_latency_ms", 0)
+        
         print(f"🎉 Answer processing completed successfully for session {request.session_id}")
+        print(f"🏗️ Architecture used: {result['architecture']}")
+        print(f"🤖 Agent used: {result['agent_used']}")
+        print(f"💾 State storage: {result['state_storage']}")
+        
         return result
         
     except Exception as e:
         error_msg = f"Failed to process answer: {str(e)}"
         print(f"❌ {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
-
 
 @app.post("/api/interviews/{interview_id}/complete")
 def complete_interview(interview_id: int, transcript_data: Dict[str, Any], db: Session = Depends(get_db)):
@@ -1062,185 +1078,9 @@ def test_celery_task():
         "status": "Task queued successfully"
     }
 
-@app.get("/test-websocket")
-async def test_websocket_endpoint():
-    """Test endpoint to verify WebSocket configuration"""
-    return {
-        "status": "websocket_ready",
-        "message": "WebSocket endpoint is configured and ready",
-        "endpoint": "/ws/{session_id}",
-        "cors_origins": origins,
-        "timestamp": datetime.now().isoformat()
-    }
 
-@app.get("/websocket-info")
-async def websocket_info():
-    """Get WebSocket connection information"""
-    return {
-        "active_connections": len(active_connections),
-        "websocket_endpoint": "/ws/{session_id}",
-        "cors_enabled": True,
-        "allow_origins": origins,
-        "timestamp": datetime.now().isoformat()
-    }
 
-@app.websocket("/ws/{session_id}")
-async def websocket_endpoint(websocket: WebSocket, session_id: str):
-    """WebSocket endpoint for real-time communication with interview sessions"""
-    try:
-        # Accept the WebSocket connection
-        await websocket.accept()
-        
-        # Add to active connections
-        active_connections.append(websocket)
-        print(f"✅ WebSocket: Session {session_id} connected successfully")
-        
-        # Send a welcome message
-        await websocket.send_text(json.dumps({
-            "type": "connection_status",
-            "message": "WebSocket connection established",
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat()
-        }))
-        
-        # Set up Redis pub/sub for this session
-        redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
-        print(f"🔌 WebSocket: Attempting Redis connection to {redis_url}")
-        
-        try:
-            redis_client = redis.from_url(redis_url)
-            # Test Redis connection
-            redis_client.ping()
-            print(f"✅ WebSocket: Redis connection successful")
-            
-            pubsub = redis_client.pubsub()
-            
-            # Subscribe to the session-specific channel
-            channel_name = f"channel:{session_id}"
-            pubsub.subscribe(channel_name)
-            print(f"🔌 WebSocket: Subscribed to Redis channel {channel_name}")
-            
-            # CRITICAL FIX: Wait for subscription to be ready
-            print(f"⏳ Waiting for Redis subscription to be ready...")
-            time.sleep(2)  # Wait 2 seconds for subscription to be fully ready
-            print(f"✅ Redis subscription ready!")
-            
-            # Test subscription by checking if we're actually subscribed
-            channels = pubsub.channels
-            if channel_name.encode() in channels:
-                print(f"✅ WebSocket: Redis subscription confirmed for channel {channel_name}")
-            else:
-                print(f"❌ WebSocket: Redis subscription failed for channel {channel_name}")
-                print(f"   Available channels: {channels}")
-                raise Exception("Redis subscription failed")
-            
-            # Simple subscription confirmation
-            print(f"✅ WebSocket: Redis subscription ready for {channel_name}") 
 
-        except Exception as e:
-            print(f"❌ WebSocket: Redis connection/subscription error: {e}")
-            # Send error to client
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": f"Redis connection failed: {str(e)}",
-                "session_id": session_id,
-                "timestamp": datetime.now().isoformat()
-            }))
-            raise e
-        
-        # Send initial status
-        await websocket.send_text(json.dumps({
-            "type": "status",
-            "message": f"Listening for AI responses on channel {channel_name}",
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat()
-        }))
-        
-        # Keep connection alive and handle messages from both client and Redis
-        print(f"🔄 WebSocket: Starting message handling loop for session {session_id}")
-        
-        while True:
-            try:
-                # Check for Redis messages (non-blocking)
-                try:
-                    redis_message = pubsub.get_message(timeout=0.5)  # Increased timeout
-                    if redis_message:
-                        print(f"📨 WebSocket: Redis message received: {redis_message}")
-                        
-                        if redis_message['type'] == 'message':
-                            # This is a message from the Celery task (AI response)
-                            ai_question = redis_message['data'].decode('utf-8')
-                            print(f"🤖 WebSocket: AI question received from Redis for session {session_id}: {ai_question[:100]}...")
-                            
-                            # Send the AI question to the client
-                            await websocket.send_text(json.dumps({
-                                "type": "question",
-                                "content": ai_question,
-                                "session_id": session_id,
-                                "timestamp": datetime.now().isoformat()
-                            }))
-                            print(f"✅ WebSocket: AI question sent to client for session {session_id}")
-                            
-                        elif redis_message['type'] == 'subscribe':
-                            print(f"🔌 WebSocket: Redis subscription message: {redis_message}")
-                        else:
-                            print(f"🔌 WebSocket: Other Redis message: {redis_message}")
-                    
-                except Exception as redis_error:
-                    print(f"❌ WebSocket: Redis message handling error: {redis_error}")
-                    # Continue trying to handle client messages
-                
-                # Check for client messages (non-blocking)
-                try:
-                    data = await websocket.receive_text()
-                    print(f"📨 WebSocket: Message from client session {session_id}: {data}")
-                    
-                    # Echo back the message (for testing)
-                    response = {
-                        "type": "message_received",
-                        "message": f"Message received: {data}",
-                        "session_id": session_id,
-                        "timestamp": datetime.now().isoformat()
-                    }
-                    await websocket.send_text(json.dumps(response))
-                    
-                except Exception as e:
-                    # No message from client, continue checking Redis
-                    if "timeout" not in str(e).lower():
-                        print(f"❌ WebSocket: Error handling message from session {session_id}: {e}")
-                        break
-                    continue
-                
-            except Exception as e:
-                print(f"❌ WebSocket: Error in main loop for session {session_id}: {e}")
-                break
-                
-    except Exception as e:
-        print(f"❌ WebSocket: Connection error for session {session_id}: {e}")
-        # Try to send error message if possible
-        try:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": f"Connection error: {str(e)}",
-                "session_id": session_id,
-                "timestamp": datetime.now().isoformat()
-            }))
-        except:
-            pass  # Ignore if we can't send error message
-        
-    finally:
-        # Clean up connection and Redis subscription
-        try:
-            if 'pubsub' in locals():
-                pubsub.unsubscribe(channel_name)
-                pubsub.close()
-                print(f"🔌 WebSocket: Redis subscription closed for session {session_id}")
-        except Exception as e:
-            print(f"⚠️ WebSocket: Error closing Redis subscription for session {session_id}: {e}")
-            
-        if websocket in active_connections:
-            active_connections.remove(websocket)
-        print(f"🔌 WebSocket: Session {session_id} disconnected")
 
 @app.get("/test-redis")
 def test_redis():
