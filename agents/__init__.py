@@ -1,4 +1,4 @@
-from agents.utils import get_gemini_client, get_redis_client
+
 from agents.persona import (
     PersonaAgent,
     RouterAgent,
@@ -12,10 +12,6 @@ from agents.interview_manager import (
 )
 
 __all__ = [
-    # Core utilities
-    'get_gemini_client',
-    'get_redis_client',
-    
     # Interview Manager functions
     'create_interview_plan',
     'create_interview_plan_with_ai',
