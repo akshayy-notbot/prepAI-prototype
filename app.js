@@ -580,17 +580,17 @@ async function startInterview() {
             console.log('🎯 Interview started with session ID:', sessionId);
             console.log('🎯 Interview response:', interviewResponse);
             
-            // Display the first question if it exists in the response
-            if (interviewResponse.first_question) {
-                console.log('🤖 Displaying first question from API response');
-                displayAIMessage(interviewResponse.first_question);
-                updateQuestionStatus('First question received');
+            // Display the opening statement if it exists in the response
+            if (interviewResponse.opening_statement) {
+                console.log('🤖 Displaying opening statement from API response');
+                displayAIMessage(interviewResponse.opening_statement);
+                updateQuestionStatus('Opening statement received');
                 enableChatInput();
                 updateQuestionStatus('Ready for your answer');
             } else {
-                console.log('❌ No first question received from API');
-                updateQuestionStatus('Error: No question received');
-                displayErrorMessage('Failed to receive the first question. Please try again.');
+                console.log('❌ No opening statement received from API');
+                updateQuestionStatus('Error: No opening statement received');
+                displayErrorMessage('Failed to receive the opening statement. Please try again.');
             }
             
         } else {

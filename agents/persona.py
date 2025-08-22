@@ -78,7 +78,7 @@ Analyze the user's answer in the context of the current topic's goal. Based on y
 {{
   "analysis_summary": "A 5-10 word summary of the user's answer.",
   "goal_achieved": <true or false>,
-  "next_action": "<Choose ONE of the following: 'ACKNOWLEDGE_AND_TRANSITION' | 'GENERATE_FOLLOW_UP' | 'REDIRECT_TO_TOPIC' | 'ANSWER_CLARIFICATION'>",
+  "next_action": "<Choose ONE of the following: 'START_INTERVIEW' | 'ACKNOWLEDGE_AND_TRANSITION' | 'GENERATE_FOLLOW_UP' | 'REDIRECT_TO_TOPIC' | 'ANSWER_CLARIFICATION'>",
   "qualitative_markers": ["<marker1>", "<marker2>"]  // Specific observations about their approach
 }}
 
@@ -175,6 +175,15 @@ class GeneratorAgent:
 **EXECUTE YOUR TASK:**
 Based on the `triggering_action`, generate your response.
 
+- **IF `triggering_action` is 'START_INTERVIEW'**:
+  Your response MUST have three parts, delivered as a single, natural monologue:
+  1. **A brief greeting:** Introduce yourself according to your persona (e.g., "Hi, thanks for coming in today. My name is Alex and I'm a Senior PM on the growth team here.").
+  2. **Set the stage:** Clearly and concisely present the `session_narrative` to the candidate as the problem statement for today's interview.
+  3. **Ask the opening question:** Ask the first question related to the *first topic* in the `topic_graph`. Your question should flow naturally from the narrative you just presented.
+
+  **Example of a good opening:**
+  "Hi, thanks for your time today. I'm a Product Manager here at CampusConnect. So, for today's interview, I'd like to walk through a hypothetical scenario. Let's say our team is tasked with improving user engagement on our social media app, 'CampusConnect'. While we get a lot of sign-ups, we're seeing low retention and users aren't exploring many features. So, to start, what are some of your initial hypotheses about *why* college students might not be engaging as much as we'd expect?"
+
 - **IF `triggering_action` is 'ACKNOWLEDGE_AND_TRANSITION'**:
   Your response MUST have two parts:
   1. A brief, validating closing statement for the previous topic (e.g., "Okay, that clarifies your approach to user segmentation.").
@@ -268,10 +277,53 @@ class PersonaAgent:
             if not current_topic:
                 raise ValueError(f"Current topic {session_state['current_topic_id']} not found in topic graph")
             
-            # Step 3: Prepare conversation history for Router
+            # Step 3: Check if this is the first question (no conversation history)
+            is_first_question = len(session_state.get("conversation_history", [])) == 0 and not user_answer
+            
+            if is_first_question:
+                # For first question, use START_INTERVIEW action with GeneratorAgent
+                generator_result = self.generator_agent.generate_response(
+                    persona_role=interviewer_persona,
+                    persona_company_context="Tech Company",
+                    interview_style="Professional and engaging",
+                    session_narrative=session_narrative,
+                    topic_graph_json=topic_graph,
+                    current_topic_id=session_state["current_topic_id"],
+                    covered_topic_ids=session_state.get("covered_topic_ids", []),
+                    conversation_history=[],
+                    triggering_action="START_INTERVIEW"
+                )
+                response_text = generator_result["response_text"]
+                agent_used = "generator_start_interview"
+                agent_latency = generator_result.get("generator_latency_ms", 0)
+                
+                # Update session state with the opening statement
+                session_state = self._update_conversation_history(
+                    session_id, 
+                    session_state, 
+                    "", 
+                    response_text
+                )
+                
+                # Save updated session state to Redis
+                self._save_session_state(session_id, session_state)
+                
+                return {
+                    "success": True,
+                    "response_text": response_text,
+                    "agent_used": agent_used,
+                    "router_analysis": None,
+                    "current_topic_id": session_state["current_topic_id"],
+                    "covered_topic_ids": session_state.get("covered_topic_ids", []),
+                    "total_latency_ms": round((time.time() - start_time) * 1000, 2),
+                    "agent_latency_ms": agent_latency,
+                    "session_id": session_id
+                }
+            
+            # Step 4: Prepare conversation history for Router
             conversation_history = self._prepare_conversation_history(session_state.get("conversation_history", []))
             
-            # Step 4: Router Agent Analysis (Fast - Target: < 750ms)
+            # Step 5: Router Agent Analysis (Fast - Target: < 750ms)
             router_result = self.router_agent.analyze_response(
                 interviewer_persona_summary=interviewer_persona,
                 current_topic_goal=current_topic.get("goal", ""),
@@ -279,12 +331,12 @@ class PersonaAgent:
                 user_latest_answer=user_answer
             )
             
-            # Step 5: Update session state based on Router analysis (Redis only)
+            # Step 6: Update session state based on Router analysis (Redis only)
             if router_result.get("goal_achieved", False):
                 session_state = self._mark_topic_completed(session_id, session_state, current_topic["topic_id"], router_result.get("qualitative_markers", []))
                 session_state = self._advance_to_next_topic(session_id, session_state, topic_graph)
             
-            # Step 6: Generate response based on Router's decision
+            # Step 7: Generate response based on Router's decision
             if router_result["next_action"] in ["GENERATE_FOLLOW_UP", "ACKNOWLEDGE_AND_TRANSITION"]:
                 # Use Generator Agent (Expensive - Target: < 3s)
                 generator_result = self.generator_agent.generate_response(
@@ -307,7 +359,7 @@ class PersonaAgent:
                 agent_used = "simple_logic"
                 agent_latency = 0
             
-            # Step 7: Update session state with new conversation turn (Redis only)
+            # Step 8: Update session state with new conversation turn (Redis only)
             session_state = self._update_conversation_history(
                 session_id, 
                 session_state, 
@@ -315,7 +367,7 @@ class PersonaAgent:
                 response_text
             )
             
-            # Step 8: Save updated session state to Redis (ONLY Redis during interview)
+            # Step 9: Save updated session state to Redis (ONLY Redis during interview)
             self._save_session_state(session_id, session_state)
             
             # Calculate total processing time

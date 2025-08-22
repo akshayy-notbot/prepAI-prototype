@@ -388,24 +388,24 @@ async def start_interview(request: StartInterviewRequest):
             if not first_question_result.get("success", False):
                 raise Exception(f"PersonaAgent failed: {first_question_result.get('error', 'Unknown error')}")
             
-            first_question = first_question_result["response_text"]
-            print(f"✅ First question generated using PersonaAgent: {first_question[:100]}...")
+            opening_statement = first_question_result["response_text"]
+            print(f"✅ Opening statement generated using PersonaAgent: {opening_statement[:100]}...")
             
         except Exception as persona_error:
             print(f"❌ PersonaAgent failed: {persona_error}")
-            return {"error": f"Failed to generate first question: {persona_error}"}, 500
+            return {"error": f"Failed to generate opening statement: {persona_error}"}, 500
         
-        # Check if question generation failed
-        if first_question.startswith("Error:"):
-            print(f"❌ Failed to generate first question: {first_question}")
-            return {"error": f"Failed to generate first question: {first_question}"}, 500
+        # Check if opening statement generation failed
+        if opening_statement.startswith("Error:"):
+            print(f"❌ Failed to generate opening statement: {opening_statement}")
+            return {"error": f"Failed to generate opening statement: {opening_statement}"}, 500
         
-        print(f"✅ First question generated: {first_question[:100]}...")
+        print(f"✅ Opening statement generated: {opening_statement[:100]}...")
         
         # Step 4: Create and Save the History
         interview_history = [
             {
-                "question": first_question,
+                "question": opening_statement,
                 "answer": None,
                 "timestamp": datetime.utcnow().isoformat(),
                 "question_type": "opening"
@@ -425,7 +425,7 @@ async def start_interview(request: StartInterviewRequest):
         # Step 5: Return the Response (NEW: Includes topic_graph info)
         response_data = {
             "session_id": session_id,
-            "first_question": first_question,
+            "opening_statement": opening_statement,
             "interviewer_persona": interviewer_persona,
             "total_goals": plan["total_goals"],
             "estimated_duration_minutes": plan["estimated_duration_minutes"],
