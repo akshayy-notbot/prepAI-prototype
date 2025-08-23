@@ -305,10 +305,20 @@ class InterviewSessionService:
             
             print(f"✅ Response validation passed")
             
+            # Log the AI response structure for debugging
+            print(f"🔍 AI response keys: {list(ai_generated_plan.keys())}")
+            print(f"🔍 AI response structure: {ai_generated_plan}")
+            
             # Extract the topic graph and session narrative
             topic_graph = ai_generated_plan.get("topic_graph", [])
             session_narrative = ai_generated_plan.get("session_narrative", "")
             case_study_details = ai_generated_plan.get("case_study_details", None)
+            
+            # Handle null values from AI response
+            if session_narrative is None:
+                session_narrative = ""
+            if case_study_details is None:
+                case_study_details = {}
             
             print(f"🔍 Topic graph length: {len(topic_graph)}")
             print(f"🔍 Session narrative length: {len(session_narrative)}")
@@ -320,14 +330,19 @@ class InterviewSessionService:
             # Transform topic graph into our standardized format
             goals = []
             for topic in topic_graph:
+                # Ensure topic is a dictionary and handle null values
+                if not isinstance(topic, dict):
+                    print(f"⚠️ Warning: Skipping invalid topic: {topic}")
+                    continue
+                    
                 goals.append({
                     "topic_id": topic.get("topic_id", f"topic_{len(goals)}"),
                     "skill": topic.get("primary_skill", "Unknown Skill"),
                     "topic_name": topic.get("topic_name", "Unknown Topic"),
                     "description": topic.get("goal", ""),
                     "status": "pending",
-                    "dependencies": topic.get("dependencies", []),
-                    "keywords": topic.get("keywords_for_persona_agent", []),
+                    "dependencies": topic.get("dependencies", []) if topic.get("dependencies") is not None else [],
+                    "keywords": topic.get("keywords_for_persona_agent", []) if topic.get("keywords_for_persona_agent") is not None else [],
                     "probes_needed": 1,  # Default to 1 probe per topic
                     "difficulty": "intermediate"  # Default difficulty
                 })
