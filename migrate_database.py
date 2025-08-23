@@ -25,6 +25,34 @@ def migrate_database():
         Base.metadata.create_all(bind=get_engine())
         print("✅ All tables created successfully")
         
+        # Update session_narrative to be nullable for flexible responses
+        print("🔧 Updating session_narrative field to be nullable...")
+        engine = get_engine()
+        with engine.connect() as conn:
+            try:
+                # Check if the column exists and update it
+                result = conn.execute("""
+                    SELECT column_name, is_nullable 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'topic_graphs' 
+                    AND column_name = 'session_narrative'
+                """)
+                
+                if result.fetchone():
+                    # Update the column to be nullable
+                    conn.execute("""
+                        ALTER TABLE topic_graphs 
+                        ALTER COLUMN session_narrative DROP NOT NULL
+                    """)
+                    print("✅ Updated session_narrative to be nullable")
+                else:
+                    print("ℹ️ session_narrative column not found (may be a new table)")
+            except Exception as e:
+                print(f"⚠️ Could not update session_narrative: {e}")
+                print("ℹ️ This is okay if the table is new or already updated")
+        
+        conn.close()
+        
         # Test database connection
         db = get_session_local()()
         print("🔌 Database connection test successful")

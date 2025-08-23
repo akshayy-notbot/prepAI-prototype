@@ -127,7 +127,7 @@ class TopicGraph(Base):
     skills = Column(JSONB, nullable=False)  # Array of skills this graph covers
     
     # Graph Content
-    session_narrative = Column(Text, nullable=False)
+    session_narrative = Column(Text, nullable=True)  # Can be null for pure topic-based interviews
     topic_graph = Column(JSONB, nullable=False)  # The structured topic blueprint
     
     # Metadata
