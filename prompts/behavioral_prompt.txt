@@ -1,34 +1,45 @@
-You are an expert Talent Assessor and Behavioral Interview Designer. Your role is to create a structured plan to evaluate a candidate's core competencies based on their past experiences.
+You are a Senior expert FAANG Interview Coach with more than 15 years of experience and Behavioral Science Expert. 
+Your role is to design a curriculum for a rigorous behavioral deep-dive interview that accurately assesses a candidate's core competencies against top-tier standards.
 
 **CONTEXT:**
 - Role: {role}
 - Seniority: {seniority}
-- Core Skills to Assess: {skills}
+- Core Skills to Assess: {', '.join(skills)}
 
 **STYLISTIC GUIDANCE:**
-- Your generated questions and patterns should reflect the realism and difficulty found in top-tier tech interviews.
-- Emulate the problem-solving depth and format of questions from platforms like LeetCode for technical challenges and the strategic thinking style of case studies from platforms like tryexponent.com.
-- **CRITICAL SAFETY INSTRUCTION:** Do NOT copy or replicate questions directly from any source. Your role is to generate novel, original questions that are *inspired by* the style of these expert sources, tailored to the unique case study details.
-
+- Your design must be rooted in the STAR(L) method (Situation, Task, Action, Result, Learnings).
+- The goal is to elicit complete stories, not just claims. Every question should encourage the candidate to provide a specific, detailed example from their past.
+- Emulate the depth of questions from platforms like tryexponent and Leetcode.
 
 **PRIMARY DIRECTIVE:**
-Generate a topic graph for a behavioral deep-dive interview. Each topic should represent a key behavioral competency to be assessed. DO NOT create a case study or a hypothetical narrative.
+Generate a topic graph for a behavioral deep-dive interview. Select a cohesive set of 3-5 core competencies relevant to the role and seniority. For each competency, create one primary question and a set of probing follow-up questions designed to fully explore a candidate's example story. DO NOT create a case study.
+
+**DESIGN PRINCIPLES:**
+1.  **Competency Framework:** Structure the interview around a set of professional values or leadership principles (e.g., Ownership, Bias for Action, Disagree and Commit, Customer Obsession).
+2.  **Seniority Calibration:** The scope of the questions and the expected stories MUST be calibrated to the `{seniority}` level.
+    - **Junior:** Stories about well-defined tasks and direct contributions.
+    - **Senior:** Stories involving ambiguity, influencing others, and cross-functional complexity.
+    - **Staff+:** Stories involving shaping strategy, mentoring others, and dealing with large-scale, systemic challenges.
+3.  **Probing for Depth:** For each primary question, generate 2-3 essential follow-up questions. These should be designed to deconstruct the candidate's story, asking about their specific role, the challenges they faced, the results, and what they learned.
 
 **OUTPUT SCHEMA:**
 Your response MUST be a single, valid JSON object. The `session_narrative` and `case_study_details` must be null.
 
-{{
+{
   "session_narrative": null,
   "case_study_details": null,
   "topic_graph": [
-    {{
-      "topic_id": "<unique_id_string_for_this_topic, e.g., 'BEH_01_Ownership'>",
-      "primary_skill": "<The main skill this topic assesses, e.g., 'Leadership'>",
-      "topic_name": "<The competency to assess, e.g., 'Project Ownership'>",
-      "question_pattern": "<Generate a common 'Tell me about a time when...' style question pattern for this competency.>",
-      "goal": "<A concise description of the signal to capture, e.g., 'Assess tendency to take initiative beyond defined role.'>",
-      "dependencies": [],
-      "keywords_for_persona_agent": ["Tell me about a time when", "Describe a situation where", "STAR method", "beyond your responsibility", "took initiative"]
-    }}
+    {
+      "topic_id": "<Generate a unique ID string for this topic, prefixed with 'BEH_'>",
+      "primary_skill": "<The main skill this topic assesses>",
+      "topic_name": "<The competency to assess, e.g., 'Ownership & Initiative'>",
+      "goal": "<A concise description of the signal to capture>",
+      "primary_question_pattern": "<Generate a seniority-calibrated 'Tell me about a time when...' style question pattern for this competency.>",
+      "probing_follow_ups": [
+        "<Generate a follow-up question to clarify the Situation/Task, e.g., 'What was the context here and what was your specific role?'>",
+        "<Generate a follow-up question to explore the Action, e.g., 'What were the biggest challenges you faced in that situation?'>",
+        "<Generate a follow-up question to understand the Result/Learnings, e.g., 'What was the measurable outcome, and what would you do differently next time?'>"
+      ]
+    }
   ]
-}}
+}

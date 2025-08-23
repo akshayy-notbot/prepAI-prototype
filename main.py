@@ -664,13 +664,13 @@ async def submit_answer(request: SubmitAnswerRequest):
         last_turn["answer"] = request.answer
         print(f"✅ Updated last turn with user's answer: {request.answer[:50]}...")
         
-        # C. NEW ARCHITECTURE: Use PersonaAgent for Response Generation
-        print("🎭 Using NEW PersonaAgent system for response generation...")
+        # C. NEW ARCHITECTURE: Use Unified PersonaAgent for Response Generation
+        print("🎭 Using NEW Unified PersonaAgent system for response generation...")
         
         try:
             persona_agent = PersonaAgent()
             
-            # Process the user response using the new two-prompt system
+            # Process the user response using the new unified PersonaAgent system
             persona_result = persona_agent.process_user_response(
                 session_id=request.session_id,
                 user_answer=request.answer,
@@ -683,14 +683,23 @@ async def submit_answer(request: SubmitAnswerRequest):
                 raise Exception(f"PersonaAgent failed: {persona_result.get('error', 'Unknown error')}")
             
             new_ai_question = persona_result["response_text"]
-            agent_used = persona_result.get("agent_used", "unknown")
-            router_analysis = persona_result.get("router_analysis", {})
+            agent_used = persona_result.get("agent_used", "unified_persona")
+            turn_type = persona_result.get("turn_type", "MID_INTERVIEW")
             current_topic_id = persona_result.get("current_topic_id", "")
             covered_topic_ids = persona_result.get("covered_topic_ids", [])
+            goal_achieved = persona_result.get("goal_achieved", False)
             
-            print(f"✅ PersonaAgent generated response using {agent_used} agent")
-            print(f"📊 Router analysis: {router_analysis.get('next_action', 'unknown')}")
+            print(f"✅ PersonaAgent generated response using {agent_used}")
+            print(f"📊 Turn type: {turn_type}")
             print(f"🎯 Current topic: {current_topic_id}")
+            print(f"🎯 Goal achieved: {goal_achieved}")
+            
+            # Check if interview is complete
+            if turn_type == "END_OF_INTERVIEW":
+                print("🎉 Interview completed by PersonaAgent!")
+                # Update plan status to completed
+                plan["status"] = "completed"
+                plan["completed_goals"] = len(covered_topic_ids)
             
         except Exception as persona_error:
             print(f"❌ PersonaAgent failed, falling back to legacy method: {persona_error}")
@@ -792,21 +801,21 @@ async def submit_answer(request: SubmitAnswerRequest):
             "timestamp": datetime.now().isoformat(),
             
             # NEW: Architecture Information
-            "architecture": "new_two_loop" if "router_analysis" in locals() else "legacy_fallback",
+            "architecture": "unified_persona",
             "agent_used": agent_used,
             "current_topic_id": current_topic_id if "current_topic_id" in locals() else "",
             "covered_topic_ids": covered_topic_ids if "covered_topic_ids" in locals() else [],
+            "turn_type": turn_type if "turn_type" in locals() else "MID_INTERVIEW",
             
             # NEW: State Management Information
             "state_storage": "redis_only",  # All real-time state stays in Redis
             "postgresql_write": "none"  # No database writes during interview
         }
         
-        # Add router analysis if available
-        if "router_analysis" in locals():
-            result["router_analysis"] = router_analysis
+        # Add PersonaAgent metrics if available
+        if "persona_result" in locals():
             result["total_latency_ms"] = persona_result.get("total_latency_ms", 0)
-            result["agent_latency_ms"] = persona_result.get("agent_latency_ms", 0)
+            result["goal_achieved"] = persona_result.get("goal_achieved", False)
         
         print(f"🎉 Answer processing completed successfully for session {request.session_id}")
         print(f"🏗️ Architecture used: {result['architecture']}")
