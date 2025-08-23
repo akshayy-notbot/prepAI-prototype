@@ -247,9 +247,18 @@ class InterviewSessionService:
             model = TemperatureManager.get_model_with_config("CREATIVE_GENERATION")
             print(f"✅ Model configured with temperature: {model}")
             
-            print(f"📤 Sending prompt to Gemini API...")
-            response = model.generate_content(prompt)
-            print(f"✅ Gemini API response received")
+            # Add retry logic for wrong response types
+            max_retries = 2
+            for attempt in range(max_retries):
+                try:
+                    print(f"📤 Sending prompt to Gemini API (attempt {attempt + 1}/{max_retries})...")
+                    response = model.generate_content(prompt)
+                    print(f"✅ Gemini API response received")
+                    break
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        raise e
+                    print(f"⚠️ Attempt {attempt + 1} failed, retrying...")
             
             response_text = response.text.strip()
             print(f"🔍 Raw response length: {len(response_text)}")
@@ -300,8 +309,23 @@ class InterviewSessionService:
             if not isinstance(ai_generated_plan, dict):
                 raise ValueError("Response is not a valid JSON object")
             
+            # Check for required fields
             if "topic_graph" not in ai_generated_plan:
+                # Check if the AI returned a case study instead of technical knowledge
+                if "session_narrative" in ai_generated_plan and ai_generated_plan["session_narrative"] is not None:
+                    print(f"⚠️ Warning: AI returned a case study narrative instead of technical knowledge topics")
+                    print(f"🔍 Session narrative preview: {str(ai_generated_plan['session_narrative'])[:200]}...")
+                    print(f"🔍 This suggests the AI misunderstood the prompt. The response should contain only technical topics, not a narrative.")
+                    raise ValueError("AI response appears to be a case study instead of technical knowledge topics. The system will automatically retry to generate the correct response type.")
+                
                 raise ValueError("Response missing required topic_graph field")
+            
+            # Validate topic_graph is a list and not empty
+            if not isinstance(ai_generated_plan["topic_graph"], list):
+                raise ValueError("topic_graph must be a list")
+            
+            if len(ai_generated_plan["topic_graph"]) == 0:
+                raise ValueError("topic_graph cannot be empty")
             
             print(f"✅ Response validation passed")
             
