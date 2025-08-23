@@ -209,12 +209,17 @@ class InterviewSessionService:
             
             # Format the prompt with proper skills handling and PRIMARY_FOCUS_SKILL
             try:
-                prompt = prompt_template.format(
-                    role=role,
-                    seniority=seniority,
-                    skills=', '.join(cleaned_skills),
-                    PRIMARY_FOCUS_SKILL=suggested_focus
-                )
+                # Use a safer formatting approach that won't interfere with JSON examples
+                prompt = prompt_template.replace('{role}', role)
+                prompt = prompt.replace('{seniority}', seniority)
+                prompt = prompt.replace('{skills}', ', '.join(cleaned_skills))
+                prompt = prompt.replace('{PRIMARY_FOCUS_SKILL}', suggested_focus)
+                
+                # Validate that all placeholders were replaced
+                if '{role}' in prompt or '{seniority}' in prompt or '{skills}' in prompt or '{PRIMARY_FOCUS_SKILL}' in prompt:
+                    print(f"⚠️ Warning: Some placeholders may not have been replaced properly")
+                    print(f"🔍 Remaining placeholders in prompt: {[p for p in ['{role}', '{seniority}', '{skills}', '{PRIMARY_FOCUS_SKILL}'] if p in prompt]}")
+                
                 print(f"🔍 Formatted prompt length: {len(prompt)}")
                 print(f"🔍 PRIMARY_FOCUS_SKILL: {suggested_focus}")
             except Exception as format_error:

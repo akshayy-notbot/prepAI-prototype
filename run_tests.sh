@@ -49,23 +49,23 @@ fi
 case "${1:-all}" in
     "unit")
         echo "🔬 Running Unit Tests..."
-        python3 test_new_architecture.py --unit
+        python3 -m pytest tests/ -v -k "unit" --tb=short
         ;;
     "integration")
         echo "🔗 Running Integration Tests..."
-        python3 test_new_architecture.py --integration
+        python3 -m pytest tests/ -v -k "integration" --tb=short
         ;;
     "performance")
         echo "⚡ Running Performance Tests..."
-        python3 test_new_architecture.py --performance
+        python3 -m pytest tests/ -v -k "performance" --tb=short
         ;;
     "render")
         echo "☁️  Testing Render Integration..."
-        python3 test_new_architecture.py --render
+        python3 -m pytest tests/test_render_deployment.py -v --tb=short
         ;;
     "all")
         echo "🚀 Running All Tests..."
-        python3 test_new_architecture.py --all
+        python3 -m pytest tests/ -v --tb=short
         ;;
     "help"|"-h"|"--help")
         show_usage
