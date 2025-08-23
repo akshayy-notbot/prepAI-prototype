@@ -11,10 +11,10 @@ Your role is to design a sophisticated, machine-readable blueprint for a hyper-r
 - Emulate the strategic depth of case studies from platforms like tryexponent and Leetcode.
 
 **PRIMARY DIRECTIVE:**
-Generate a complete and dynamic interview narrative, not just a list of questions. 
+Generate a complete and dynamic interview narrative with a structured topic graph. 
 The central theme of your case study and the majority of the topics must be designed to assess the PRIMARY_FOCUS_SKILL: {PRIMARY_FOCUS_SKILL}. 
 Use the other skills as secondary topics to build out the interview.
-The case study must be precisely calibrated to the candidate's seniority level and should unfold in logical stages.
+The case study must be precisely calibrated to the candidate's seniority level and should unfold in logical stages through the topic_graph.
 You must also include at least one "dynamic event" to test the candidate's adaptability.
 
 **DESIGN PRINCIPLES:**
@@ -27,7 +27,7 @@ You must also include at least one "dynamic event" to test the candidate's adapt
 4.  **Competency-Driven Assessment:** Each topic must be designed to assess a specific, formal competency.
 
 **OUTPUT SCHEMA:**
-Your response MUST be a single, valid JSON object.
+Your response MUST be a single, valid JSON object with the following structure:
 
 {
   "session_narrative": "<Generate a brief, 1-2 sentence project scenario to provide context for the entire interview>",
@@ -41,20 +41,16 @@ Your response MUST be a single, valid JSON object.
     "coreProblem": "<Generate a concise, challenging business or technical problem, SCOPED APPROPRIATELY FOR THE CANDIDATE'S SENIORITY>",
     "keyFeatures": ["<List 3-4 key features of the fictional application>"]
   },
-  "interview_stages": [
+  "topic_graph": [
     {
-      "stage_name": "<Provide a name for this stage of the interview, e.g., 'Problem Definition & Scoping'>",
-      "topics": [
-        {
-          "topic_id": "<Generate a unique ID string for this topic, prefixed with 'CS_'>",
-          "primary_skill": "<The main skill from the user's list that this topic assesses>",
-          "topic_name": "<Generate a short, descriptive name for this topic>",
-          "competency_assessed": "<Identify the primary professional competency this topic evaluates, e.g., 'Product Sense', 'Analytical Skills', 'Strategic Thinking'>",
-          "question_pattern": "<Generate a reusable, seniority-appropriate question pattern for this topic using placeholders where necessary>",
-          "goal": "<Generate a concise description of the signal to capture from the candidate>",
-          "dependencies": ["<List of topic_ids that must precede this one, or an empty list []>"]
-        }
-      ]
+      "topic_id": "<Generate a unique ID string for this topic, prefixed with 'CS_'>",
+      "primary_skill": "<The main skill from the user's list that this topic assesses>",
+      "topic_name": "<Generate a short, descriptive name for this topic>",
+      "competency_assessed": "<Identify the primary professional competency this topic evaluates, e.g., 'Product Sense', 'Analytical Skills', 'Strategic Thinking'>",
+      "question_pattern": "<Generate a reusable, seniority-appropriate question pattern for this topic using placeholders where necessary>",
+      "goal": "<Generate a concise description of the signal to capture from the candidate>",
+      "dependencies": ["<List of topic_ids that must precede this one, or an empty list []>"],
+      "keywords_for_persona_agent": ["<Generate 3-5 keywords for the persona agent>"]
     }
   ],
   "dynamic_events": [
