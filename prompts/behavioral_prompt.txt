@@ -4,7 +4,7 @@ Your role is to design a curriculum for a rigorous behavioral deep-dive intervie
 **CONTEXT:**
 - Role: {role}
 - Seniority: {seniority}
-- Core Skills to Assess: {', '.join(skills)}
+- Core Skills to Assess: {skills}
 
 **STYLISTIC GUIDANCE:**
 - Your design must be rooted in the STAR(L) method (Situation, Task, Action, Result, Learnings).
@@ -12,7 +12,10 @@ Your role is to design a curriculum for a rigorous behavioral deep-dive intervie
 - Emulate the depth of questions from platforms like tryexponent and Leetcode.
 
 **PRIMARY DIRECTIVE:**
-Generate a topic graph for a behavioral deep-dive interview. Select a cohesive set of 3-5 core competencies relevant to the role and seniority. For each competency, create one primary question and a set of probing follow-up questions designed to fully explore a candidate's example story. DO NOT create a case study.
+Generate a topic graph for a behavioral deep-dive interview. 
+The central theme and the majority of the topics must be designed to assess the PRIMARY_FOCUS_SKILL: {PRIMARY_FOCUS_SKILL}. 
+Use the other skills as secondary topics to build out the interview.
+Select a cohesive set of 3-5 core competencies relevant to the role and seniority. For each competency, create one primary question and a set of probing follow-up questions designed to fully explore a candidate's example story. DO NOT create a case study.
 
 **DESIGN PRINCIPLES:**
 1.  **Competency Framework:** Structure the interview around a set of professional values or leadership principles (e.g., Ownership, Bias for Action, Disagree and Commit, Customer Obsession).

@@ -365,7 +365,7 @@ def test_interview_manager():
     print("\n🧪 Testing InterviewManager...")
     
     try:
-        from agents.interview_manager import create_interview_plan_with_ai
+        from agents.InterviewSessionService import create_interview_plan_with_ai
         
         # Test topic graph generation
         test_data = {

@@ -23,7 +23,7 @@ def get_gemini_client():
 
 def select_interview_archetype(role: str, seniority: str, skills: list) -> Dict[str, Any]:
     """
-    Analyze user input and determine the most appropriate interview archetype.
+    Analyze user input and determine the most appropriate interview archetype using expert heuristics.
     
     Args:
         role (str): The role the user is interviewing for
@@ -31,7 +31,7 @@ def select_interview_archetype(role: str, seniority: str, skills: list) -> Dict[
         skills (list): List of skills the user wants to practice
     
     Returns:
-        Dict[str, Any]: Contains archetype and reasoning
+        Dict[str, Any]: Contains archetype, confidence_score, reasoning, and suggested_focus
     """
     
     try:
@@ -44,28 +44,37 @@ def select_interview_archetype(role: str, seniority: str, skills: list) -> Dict[
         # If we can't even configure the API, this is a critical error
         raise ValueError(f"Failed to configure Gemini API for archetype selection: {str(e)}")
     
-    prompt = f"""You are an expert AI career coach and interview planner. Your job is to analyze a user's career goals and the skills they want to practice to determine the most effective interview format for them.
+    prompt = f"""You are a Principal Recruiter and Interview Strategist from a top-tier tech company. You have decades of experience designing interview loops. Your expertise lies in analyzing a candidate's profile and desired skills to recommend the single most effective interview format to test their core abilities.
 
 **USER PROFILE:**
 - Role: {role}
 - Seniority: {seniority}
 - Skills to Practice: {', '.join(skills)}
 
-**DECISION FRAMEWORK:**
-- Use a 'CASE_STUDY' for roles and skills that require problem-solving in a hypothetical business context (e.g., Product Management, System Design, Go-to-Market Strategy).
-- Use a 'BEHAVIORAL_DEEP_DIVE' for skills related to leadership, teamwork, and past experiences (e.g., Stakeholder Management, Conflict Resolution, Project Ownership). This is common for all senior roles.
-- Use a 'TECHNICAL_KNOWLEDGE_SCREEN' for skills that test specific, factual knowledge (e.g., Data Structures, API Design, SQL).
-- If the skills are a clear mix (e.g., 'System Design' and 'Team Leadership'), you can select a 'MIXED' archetype.
+**DECISION HEURISTICS (Your Guiding Principles):**
+1.  **Primary Intent:** Your primary goal is to identify the user's core intent. Is this a practice session for a problem-solving loop, a behavioral screen, or a technical knowledge test?
+2.  **Role and Seniority Weighting:** The user's `{role}` and `{seniority}` are strong signals.
+    - Product and senior engineering roles often lean towards `CASE_STUDY` (System Design, Product Sense).
+    - All senior and leadership roles require a strong behavioral component. If behavioral skills are listed alongside technical ones, consider which is the likely focus of the interview they are preparing for.
+3.  **Skill Categorization:** Mentally categorize the listed skills.
+    - **Problem-Solving Skills** (e.g., System Design, Go-to-Market Strategy, API Design) strongly suggest `CASE_STUDY`.
+    - **Experience-Based Skills** (e.g., Leadership, Stakeholder Management, Conflict Resolution) strongly suggest `BEHAVIORAL_DEEP_DIVE`.
+    - **Factual Knowledge Skills** (e.g., SQL, Data Structures, Algorithms) strongly suggest `TECHNICAL_KNOWLEDGE_SCREEN`.
+4.  **The `MIXED` Archetype:** Only use the `MIXED` archetype if there is a clear and balanced demand for two distinct formats (e.g., a junior candidate asking for "Data Structures" and "Teamwork"). For senior roles, try to infer the primary format.
 
 **YOUR TASK:**
-Based on the user's profile and the decision framework, select the single most appropriate interview archetype.
+Based on the user's profile and your expert heuristics, analyze the inputs and determine the single most effective interview archetype.
+Provide a confidence score for your recommendation.
+From the list of Skills to Practice, you must also identify the single most significant skill that should be the central theme of the interview.
 
 **OUTPUT SCHEMA:**
 Your response MUST be a single, valid JSON object and nothing else.
 
 {{
   "archetype": "<Choose ONE: 'CASE_STUDY' | 'BEHAVIORAL_DEEP_DIVE' | 'TECHNICAL_KNOWLEDGE_SCREEN' | 'MIXED'>",
-  "reasoning": "A brief, one-sentence explanation for your choice."
+  "confidence_score": <A float between 0.0 and 1.0 representing your confidence in the chosen archetype>,
+  "reasoning": "A brief, one-sentence explanation for your choice, justifying it based on the heuristics.",
+  "suggested_focus": "Based on the skills, suggest the primary skill that the generated interview should focus on."
 }}"""
 
     try:
@@ -101,7 +110,19 @@ Your response MUST be a single, valid JSON object and nothing else.
         if "archetype" not in result:
             raise ValueError("Response missing required archetype field")
         
+        # Validate new fields if present
+        if "confidence_score" in result:
+            confidence = result["confidence_score"]
+            if not isinstance(confidence, (int, float)) or confidence < 0.0 or confidence > 1.0:
+                print(f"⚠️ Warning: confidence_score {confidence} is not a valid float between 0.0 and 1.0")
+        
+        if "suggested_focus" in result:
+            print(f"✅ Suggested focus: {result['suggested_focus']}")
+        
         print(f"✅ Archetype selection successful: {result['archetype']}")
+        if "confidence_score" in result:
+            print(f"✅ Confidence score: {result['confidence_score']}")
+        
         return result
         
     except json.JSONDecodeError as e:

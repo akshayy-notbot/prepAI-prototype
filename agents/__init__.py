@@ -1,11 +1,11 @@
 # Agents module for PrepAI
 # This module contains the AI agents that power the interview system
 
-from .interview_manager import (
+from .InterviewSessionService import (
+    InterviewSessionService,
     create_interview_plan,
     create_interview_plan_with_ai,
-    update_goal_status,
-    get_plan_summary
+    get_initial_plan_summary
 )
 
 from .archetype_selector import select_interview_archetype
@@ -17,13 +17,13 @@ from .evaluation import evaluate_answer
 from .temperature_manager import TemperatureManager, get_creative_model, get_classification_model
 
 __all__ = [
+    'InterviewSessionService',
     'create_interview_plan',
     'create_interview_plan_with_ai',
+    'get_initial_plan_summary',
     'select_interview_archetype',
     'PersonaAgent',
     'evaluate_answer',
-    'update_goal_status',
-    'get_plan_summary',
     'TemperatureManager',
     'get_creative_model',
     'get_classification_model'

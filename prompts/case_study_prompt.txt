@@ -4,14 +4,18 @@ Your role is to design a sophisticated, machine-readable blueprint for a hyper-r
 **CONTEXT:**
 - Role: {role}
 - Seniority: {seniority}
-- Core Skills to Assess: {', '.join(skills)}
+- Core Skills to Assess: {skills}
 
 **STYLISTIC GUIDANCE:**
 - Your design should reflect the rigorous, first-principles thinking required in FAANG-level interviews.
 - Emulate the strategic depth of case studies from platforms like tryexponent and Leetcode.
 
 **PRIMARY DIRECTIVE:**
-Generate a complete and dynamic interview narrative, not just a list of questions. The case study must be precisely calibrated to the candidate's seniority level and should unfold in logical stages. You must also include at least one "dynamic event" to test the candidate's adaptability.
+Generate a complete and dynamic interview narrative, not just a list of questions. 
+The central theme of your case study and the majority of the topics must be designed to assess the PRIMARY_FOCUS_SKILL: {PRIMARY_FOCUS_SKILL}. 
+Use the other skills as secondary topics to build out the interview.
+The case study must be precisely calibrated to the candidate's seniority level and should unfold in logical stages.
+You must also include at least one "dynamic event" to test the candidate's adaptability.
 
 **DESIGN PRINCIPLES:**
 1.  **The Narrative Arc:** The interview must have a clear story-like progression, typically moving from understanding the problem to proposing a solution, and finally to considering execution and risks.

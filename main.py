@@ -60,11 +60,11 @@ except Exception as e:
 
 # Import our new AI-powered interview components
 try:
-    print("🔍 Importing agents.interview_manager...")
-    from agents.interview_manager import create_interview_plan
-    print("✅ agents.interview_manager imported successfully")
+    print("🔍 Importing agents.InterviewSessionService...")
+    from agents.InterviewSessionService import create_interview_plan
+    print("✅ agents.InterviewSessionService imported successfully")
 except Exception as e:
-    print(f"❌ Failed to import agents.interview_manager: {e}")
+    print(f"❌ Failed to import agents.InterviewSessionService: {e}")
     raise
 
 try:

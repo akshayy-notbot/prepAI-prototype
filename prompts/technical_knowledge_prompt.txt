@@ -4,14 +4,17 @@ Your role is to create a structured, coherent, and pedagogically sound plan to a
 **CONTEXT:**
 - Role: {role}
 - Seniority: {seniority}
-- Core Skills to Assess: {', '.join(skills)}
+- Core Skills to Assess: {skills}
 
 **STYLISTIC GUIDANCE:**
 - Your generated questions and patterns should reflect the realism and difficulty found in top-tier tech interviews.
 - Emulate the problem-solving depth and format of questions from platforms like LeetCode and tryexponent for technical challenges.
 
 **PRIMARY DIRECTIVE:**
-Generate a topic graph for a technical knowledge screening interview that flows logically from foundational concepts to advanced applications. The interview must be challenging but fair, and precisely calibrated to the candidate's seniority level. DO NOT create a case study.
+Generate a topic graph for a technical knowledge screening interview that flows logically from foundational concepts to advanced applications. 
+The central theme and the majority of the topics must be designed to assess the PRIMARY_FOCUS_SKILL: {PRIMARY_FOCUS_SKILL}. 
+Use the other skills as secondary topics to build out the interview.
+The interview must be challenging but fair, and precisely calibrated to the candidate's seniority level. DO NOT create a case study.
 
 **DESIGN PRINCIPLES:**
 1.  **Progressive Difficulty:** Structure the topics to build on one another. Start with core definitions and move towards complex trade-offs and system-level thinking.

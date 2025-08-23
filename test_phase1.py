@@ -49,7 +49,7 @@ def test_interview_plan_generation():
     print("\n🧪 Testing Interview Plan Generation...")
     
     try:
-        from agents.interview_manager import create_interview_plan_with_ai
+        from agents.InterviewSessionService import create_interview_plan_with_ai
         
         # Test case 1: Product Manager case study
         print("\n📋 Test 1: Product Manager Case Study")
@@ -92,7 +92,7 @@ def test_prompt_templates():
     print("\n🧪 Testing Prompt Templates...")
     
     try:
-        from agents.interview_manager import load_prompt_template
+        from agents.InterviewSessionService import load_prompt_template
         
         # Test loading each template
         templates = ["CASE_STUDY", "BEHAVIORAL_DEEP_DIVE", "TECHNICAL_KNOWLEDGE_SCREEN"]
