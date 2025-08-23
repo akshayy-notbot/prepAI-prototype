@@ -473,6 +473,7 @@ async def start_interview(request: StartInterviewRequest):
                 "session_narrative": session_narrative,
                 "first_topic": topic_graph[0] if topic_graph else None
             },
+            "topic_graph": topic_graph,
             
             # NEW: Archetype and Case Study Information
             "archetype": plan.get("archetype", "CASE_STUDY"),
@@ -582,7 +583,8 @@ async def get_interview_status(session_id: str):
                 "covered_topic_ids": covered_topic_ids,
                 "session_narrative": session_narrative,
                 "next_topic": None
-            }
+            },
+            "full_topic_graph": topic_graph
         }
         
         # Find next topic
