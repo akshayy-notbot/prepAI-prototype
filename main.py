@@ -33,6 +33,8 @@ except Exception as e:
 try:
     from agents.autonomous_interviewer import AutonomousInterviewer
     from agents.session_tracker import SessionTracker
+    from agents.evaluation import evaluate_answer
+    from models import persist_complete_interview
     print("✅ Autonomous interviewer components imported successfully")
 except Exception as e:
     print(f"❌ Failed to import autonomous interviewer components: {e}")
@@ -69,6 +71,18 @@ class StartInterviewRequest(BaseModel):
 class SubmitAnswerRequest(BaseModel):
     session_id: str
     answer: str
+
+# --- Root Endpoint ---
+@app.get("/")
+@app.head("/")
+async def root():
+    """Root endpoint for health checks and service discovery"""
+    return {
+        "message": "PrepAI Autonomous Interviewer API",
+        "status": "running",
+        "health_check": "/health",
+        "docs": "/docs"
+    }
 
 # --- Health Check Endpoint ---
 @app.get("/health")
@@ -139,13 +153,16 @@ async def start_interview(request: StartInterviewRequest):
             print(f"❌ Autonomous Interviewer failed: {interviewer_error}")
             return {"error": f"Failed to generate opening statement: {interviewer_error}"}, 500
         
-        # Create and Save the History
+        # Create and Save the History with AI reasoning
         interview_history = [
             {
                 "question": opening_statement,
                 "answer": None,
                 "timestamp": datetime.utcnow().isoformat(),
-                "question_type": "opening"
+                "question_type": "opening",
+                "ai_reasoning": first_question_result.get("chain_of_thought", []),
+                "interview_state": first_question_result.get("interview_state", {}),
+                "response_latency_ms": first_question_result.get("latency_ms", 0)
             }
         ]
         
@@ -242,13 +259,31 @@ async def submit_answer(request: SubmitAnswerRequest):
             if not session_data:
                 raise Exception("Session not found or expired")
             
-            # Get conversation history in the format expected by autonomous interviewer
+            # Create the conversation history for the AI with the user's answer included
             ai_conversation_history = []
             for turn in conversation_history:
-                ai_conversation_history.append({
-                    "role": "interviewer" if turn.get("question") else "user",
-                    "content": turn.get("question", "") or turn.get("answer", "")
-                })
+                if turn.get("question"):
+                    ai_conversation_history.append({
+                        "role": "interviewer",
+                        "content": turn["question"]
+                    })
+                if turn.get("answer"):  # Make sure we include user answers
+                    ai_conversation_history.append({
+                        "role": "user", 
+                        "content": turn["answer"]
+                    })
+            
+            print(f"🔍 AI Conversation History prepared: {len(ai_conversation_history)} turns")
+            for i, turn in enumerate(ai_conversation_history):
+                print(f"  Turn {i+1}: {turn['role']} - {turn['content'][:50]}...")
+            
+            print(f"🔍 Calling autonomous_interviewer.conduct_interview_turn with:")
+            print(f"  - role: {session_data['role']}")
+            print(f"  - seniority: {session_data['seniority']}")
+            print(f"  - skill: {session_data['skill']}")
+            print(f"  - interview_stage: {session_data['current_stage']}")
+            print(f"  - conversation_history: {len(ai_conversation_history)} turns")
+            print(f"  - session_context: {session_tracker.get_session_context(request.session_id)}")
             
             # Process the user response using autonomous interviewer
             interviewer_result = autonomous_interviewer.conduct_interview_turn(
@@ -269,6 +304,10 @@ async def submit_answer(request: SubmitAnswerRequest):
             next_focus = interviewer_result["interview_state"]["next_focus"]
             
             print(f"✅ Autonomous Interviewer generated response")
+            print(f"🔍 FULL INTERVIEWER RESULT:")
+            print(f"  - Chain of Thought: {interviewer_result.get('chain_of_thought', [])}")
+            print(f"  - Response Text: {interviewer_result.get('response_text', 'No response text')}")
+            print(f"  - Interview State: {interviewer_result.get('interview_state', {})}")
             print(f"📊 Current stage: {current_stage}")
             print(f"🎯 Skill progress: {skill_progress}")
             print(f"🎯 Next focus: {next_focus}")
@@ -286,15 +325,18 @@ async def submit_answer(request: SubmitAnswerRequest):
                 session_tracker.update_session(request.session_id, {"status": "completed"})
             
         except Exception as interviewer_error:
-            print(f"❌ Autonomous Interviewer failed, falling back to simple response: {interviewer_error}")
-            new_ai_question = "Thank you for your response. Can you tell me more about your approach?"
+            print(f"❌ Autonomous Interviewer failed: {interviewer_error}")
+            raise interviewer_error
         
-        # Add the new question to the conversation history
+        # Add the new question to conversation history with AI reasoning
         conversation_history.append({
             "question": new_ai_question,
             "answer": None,
             "timestamp": datetime.utcnow().isoformat(),
-            "question_type": "follow_up"
+            "question_type": "follow_up",
+            "ai_reasoning": interviewer_result.get("chain_of_thought", []),
+            "interview_state": interviewer_result.get("interview_state", {}),
+            "response_latency_ms": interviewer_result.get("latency_ms", 0)
         })
         
         # Save updated history to Redis
@@ -323,6 +365,143 @@ async def submit_answer(request: SubmitAnswerRequest):
     except Exception as e:
         print(f"❌ Unexpected error in submit_answer: {e}")
         return {"error": f"Answer processing failed: {str(e)}"}, 500
+
+@app.post("/api/interview/{session_id}/complete")
+async def complete_interview(session_id: str):
+    """
+    Completes an interview session and provides comprehensive evaluation.
+    """
+    try:
+        print(f"🏁 Completing interview session {session_id}")
+        
+        # Retrieve conversation history from Redis
+        try:
+            redis_url = os.environ.get('REDIS_URL')
+            if not redis_url:
+                raise ValueError("REDIS_URL environment variable is required")
+            redis_client = redis.from_url(redis_url)
+            
+            history_json = redis_client.get(f"history:{session_id}")
+            if not history_json:
+                return {"error": "Interview history not found. Session may have expired."}, 404
+            
+            conversation_history = json.loads(history_json.decode('utf-8'))
+            
+        except Exception as redis_error:
+            print(f"❌ Failed to retrieve data from Redis: {redis_error}")
+            return {"error": f"Failed to retrieve interview data: {str(redis_error)}"}, 500
+        
+        # Get session data
+        try:
+            session_tracker = SessionTracker()
+            session_data = session_tracker.get_session(session_id)
+            
+            if not session_data:
+                return {"error": "Session not found"}, 404
+                
+        except Exception as session_error:
+            print(f"❌ Failed to get session data: {session_error}")
+            return {"error": f"Failed to get session data: {str(session_error)}"}, 500
+        
+        # Extract Q&A pairs for evaluation
+        qa_pairs = []
+        for i, turn in enumerate(conversation_history):
+            if turn.get("question") and turn.get("answer"):
+                qa_pairs.append({
+                    "question": turn["question"],
+                    "answer": turn["answer"]
+                })
+        
+        if not qa_pairs:
+            return {"error": "No questions and answers found for evaluation"}, 400
+        
+        print(f"📊 Found {len(qa_pairs)} Q&A pairs for evaluation")
+        
+        # Evaluate each answer using the evaluation agent
+        evaluations = []
+        skills_to_assess = session_data.get("skills", ["Problem Solving", "Communication", "Technical Knowledge"])
+        
+        for qa in qa_pairs:
+            print(f"🔍 Evaluating Q: {qa['question'][:50]}...")
+            evaluation = evaluate_answer(qa["answer"], qa["question"], skills_to_assess)
+            evaluations.append({
+                "question": qa["question"],
+                "answer": qa["answer"],
+                "evaluation": evaluation
+            })
+        
+        # Calculate overall scores
+        all_scores = []
+        for eval_data in evaluations:
+            if "evaluation" in eval_data and "scores" in eval_data["evaluation"]:
+                scores = eval_data["evaluation"]["scores"]
+                for skill, score_data in scores.items():
+                    if isinstance(score_data, dict) and "score" in score_data:
+                        all_scores.append(score_data["score"])
+        
+        overall_score = round(sum(all_scores) / len(all_scores), 1) if all_scores else 0
+        
+        # Generate comprehensive feedback
+        overall_summary = f"Interview completed with {len(qa_pairs)} questions. Overall performance score: {overall_score}/5"
+        
+        # Prepare detailed feedback structure
+        feedback_data = {
+            "overall_score": overall_score,
+            "overall_summary": overall_summary,
+            "questions_evaluated": len(qa_pairs),
+            "skills_assessed": skills_to_assess,
+            "detailed_evaluations": evaluations,
+            "session_id": session_id,
+            "role": session_data.get("role"),
+            "seniority": session_data.get("seniority"),
+            "completed_at": datetime.now().isoformat()
+        }
+        
+        # Mark session as completed
+        session_tracker.update_session(session_id, {"status": "completed"})
+        
+        # Persist the complete interview data to the database
+        try:
+            # Prepare conversation history with complete data
+            complete_conversation_history = []
+            for turn in conversation_history:
+                turn_data = {
+                    "question": turn.get("question"),
+                    "answer": turn.get("answer"),
+                    "timestamp": turn.get("timestamp"),
+                    "question_type": turn.get("question_type", "follow_up")
+                }
+                complete_conversation_history.append(turn_data)
+            
+            # Prepare final state data
+            final_state = {
+                "final_stage": session_data.get("current_stage", "unknown"),
+                "final_skill_progress": session_data.get("skill_progress", "unknown"),
+                "total_response_time_ms": 0,  # Could be calculated from timestamps
+                "average_score": overall_score,
+                "completion_time": datetime.now().isoformat(),
+                "ai_reasoning": []  # Could be enhanced to capture AI reasoning
+            }
+            
+            # Persist to database
+            persist_complete_interview(
+                session_id=session_id,
+                session_data=session_data,
+                conversation_history=complete_conversation_history,
+                evaluations=evaluations,
+                final_state=final_state
+            )
+            print(f"✅ Interview data persisted to database for session {session_id}")
+        except Exception as db_error:
+            print(f"❌ Failed to persist interview data to database: {db_error}")
+            # Continue with returning feedback data even if persistence fails
+        
+        print(f"✅ Interview completion and evaluation finished for session {session_id}")
+        return {"success": True, "data": feedback_data}
+        
+    except Exception as e:
+        print(f"❌ Unexpected error in complete_interview: {e}")
+        return {"error": f"Interview completion failed: {str(e)}"}, 500
 
 @app.get("/api/interview/{session_id}/status")
 async def get_interview_status(session_id: str):
@@ -393,6 +572,113 @@ async def startup_event():
     """Run startup checks when the FastAPI app starts"""
     print("🚀 PrepAI Autonomous Interviewer Backend Starting Up...")
     print("✅ Service is ready to serve requests!")
+
+
+# --- Database Migration Test Endpoint ---
+@app.get("/api/test-db-migration")
+async def test_database_migration():
+    """
+    Test endpoint to verify database migration worked correctly.
+    This endpoint should be removed after testing.
+    """
+    try:
+        from models import get_engine, SessionState
+        from sqlalchemy.orm import Session
+        from sqlalchemy import inspect, text
+        
+        engine = get_engine()
+        
+        # Test 1: Database connection
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1 as test"))
+            connection_test = result.fetchone()[0] == 1
+        
+        # Test 2: Table existence
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        table_test = 'session_states' in tables
+        
+        # Test 3: Column existence
+        columns = []
+        if table_test:
+            columns = [col['name'] for col in inspector.get_columns('session_states')]
+        
+        required_columns = [
+            'complete_interview_data', 'average_score'
+        ]
+        column_test = all(col in columns for col in required_columns)
+        
+        # Test 4: Data operations
+        data_test = False
+        if column_test:
+            try:
+                db_session = Session(engine)
+                
+                # Create test record
+                test_session_id = f"test_migration_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                test_data = {
+                    "test": True,
+                    "timestamp": datetime.now().isoformat(),
+                    "purpose": "migration_verification"
+                }
+                
+                new_state = SessionState(
+                    session_id=test_session_id,
+                    final_stage="test",
+                    final_skill_progress="test",
+                    final_conversation_history="test",
+                    complete_interview_data=test_data,
+                    total_turns=1,
+                    total_response_time_ms=1000,
+                    average_score=10
+                )
+                
+                db_session.add(new_state)
+                db_session.commit()
+                
+                # Retrieve and verify
+                retrieved = db_session.query(SessionState).filter(
+                    SessionState.session_id == test_session_id
+                ).first()
+                
+                if retrieved and retrieved.complete_interview_data:
+                    data_test = True
+                
+                # Clean up
+                db_session.delete(retrieved)
+                db_session.commit()
+                db_session.close()
+                
+            except Exception as e:
+                data_test = False
+        
+        return {
+            "status": "success",
+            "timestamp": datetime.now().isoformat(),
+            "tests": {
+                "database_connection": connection_test,
+                "table_existence": table_test,
+                "migration_columns": column_test,
+                "data_operations": data_test
+            },
+            "table_columns": columns,
+            "all_tests_passed": all([connection_test, table_test, column_test, data_test])
+        }
+        
+    except Exception as e:
+        return {
+            "status": "error",
+            "timestamp": datetime.now().isoformat(),
+            "error": str(e),
+            "tests": {
+                "database_connection": False,
+                "table_existence": False,
+                "migration_columns": False,
+                "data_operations": False
+            },
+            "all_tests_passed": False
+        }
+
 
 if __name__ == "__main__":
     import uvicorn
