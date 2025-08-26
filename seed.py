@@ -1,8 +1,8 @@
-from models import SessionLocal, Question, engine, Base
+from models import get_session_local, Question, get_engine, Base
 
 # This creates the 'questions' table based on our new model
 print("Creating questions table...")
-Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=get_engine())
 print("Table created.")
 
 # A list of questions to add to the database
@@ -12,7 +12,7 @@ questions_to_add = [
         role="Product Manager",
         seniority="Senior",
         skill_tags=["Product Design", "User Empathy"]
-    ),
+    ),  
     Question(
         question_text="Tell me about a time you used data to influence a product decision.",
         role="Product Manager",
@@ -40,7 +40,7 @@ questions_to_add = [
 ]
 
 # Get a database session
-db = SessionLocal()
+db = get_session_local()()
 
 print("Seeding database...")
 try:

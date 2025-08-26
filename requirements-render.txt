@@ -1,13 +1,14 @@
-# Core FastAPI and web framework dependencies
+# Production requirements for Render deployment
+# Core FastAPI and web framework
 fastapi==0.116.1
 uvicorn[standard]==0.35.0
 starlette==0.47.2
 
-# Database and ORM dependencies
+# Database and ORM
 sqlalchemy==2.0.43
 psycopg2-binary==2.9.10
 
-# AI and Google API dependencies
+# AI and Google API
 google-generativeai==0.8.5
 google-ai-generativelanguage==0.6.15
 google-api-core==2.25.1
@@ -16,7 +17,7 @@ google-auth==2.40.3
 google-auth-httplib2==0.2.0
 googleapis-common-protos==1.70.0
 
-# Data validation and serialization
+# Data validation
 pydantic==2.11.7
 pydantic-extra-types==2.10.5
 pydantic-settings==2.10.1
@@ -30,7 +31,7 @@ urllib3==2.5.0
 
 
 
-# Celery and task queue dependencies
+# Celery and task queue dependencies (CRITICAL)
 celery==5.3.1
 redis==6.4.0
 kombu==5.5.4
@@ -38,7 +39,7 @@ billiard==4.2.1
 vine==5.1.0
 amqp==5.3.1
 
-# Form handling and multipart
+# Form handling
 python-multipart==0.0.20
 
 # Environment and configuration
@@ -54,16 +55,16 @@ typer==0.16.0
 rich==14.1.0
 rich-toolkit==0.15.0
 
-# Date and time handling
+# Date and time
 python-dateutil==2.9.0.post0
 tzdata==2025.2
 
-# Text processing and formatting
+# Text processing
 markdown-it-py==4.0.0
 Pygments==2.19.2
 prompt_toolkit==3.0.51
 
-# Protocol buffers and serialization
+# Protocol buffers
 protobuf==5.29.5
 proto-plus==1.26.1
 
@@ -84,7 +85,7 @@ pyasn1_modules==0.4.2
 rsa==4.9.1
 sentry-sdk==2.35.0
 
-# Development and CLI tools
+# Development tools
 fastapi-cli==0.0.8
 fastapi-cloud-cli==0.1.5
 shellingham==1.5.4
@@ -124,3 +125,6 @@ pyparsing==3.2.3
 rignore==0.6.4
 tqdm==4.67.1
 uritemplate==4.2.0
+
+# Production server
+gunicorn==21.2.0
