@@ -334,7 +334,7 @@ async def start_interview(request: StartInterviewRequest):
             print(f"❌ Failed to create session: {session_error}")
             return {"error": f"Failed to create interview session: {session_error}"}, 500
         
-        # Step 2: Save the Plan to Redis (NEW: Includes topic_graph)
+        # Step 2: Redis storage removed - session tracker handles all state management
         try:
             redis_url = os.environ.get('REDIS_URL')
             if not redis_url:
