@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrepAI Prompt Optimizer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .left-panel, .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .panel {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+
+        .panel h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 120px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+
+        .skills-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .skills-input input {
+            flex: 1;
+        }
+
+        .skills-input button {
+            padding: 12px 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+
+        .skills-input button:hover {
+            background: #2980b9;
+        }
+
+        .skills-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .skill-tag {
+            background: #3498db;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .skill-tag button {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .test-button {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            margin-top: 20px;
+        }
+
+        .test-button:hover {
+            transform: translateY(-2px);
+        }
+
+        .test-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .results {
+            background: #2c3e50;
+            color: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .results h4 {
+            margin-bottom: 15px;
+            color: #3498db;
+        }
+
+        .json-output {
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #3498db;
+            color: white;
+        }
+
+        .control-btn.secondary {
+            border-color: #95a5a6;
+            color: #95a5a6;
+        }
+
+        .control-btn.secondary:hover {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #3498db;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #e74c3c;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .success {
+            background: #27ae60;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                margin: 10px;
+                border-radius: 12px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 PrepAI Prompt Optimizer</h1>
+            <p>Test and iterate on your case study & behavioral prompts in real-time using Gemini API</p>
+        </div>
+
+        <div class="main-content">
+            <div class="left-panel">
+                <div class="panel">
+                    <h3>📝 Interview Parameters</h3>
+                    <div class="form-group">
+                        <label for="role">Role:</label>
+                        <input type="text" id="role" placeholder="e.g., Software Engineer, Product Manager, Data Scientist" value="Software Engineer">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="seniority">Seniority Level:</label>
+                        <select id="seniority">
+                            <option value="Junior">Junior</option>
+                            <option value="Senior" selected>Senior</option>
+                            <option value="Staff">Staff</option>
+                            <option value="Principal">Principal</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="primarySkill">Primary Focus Skill:</label>
+                        <input type="text" id="primarySkill" placeholder="e.g., System Design, Leadership, Problem Solving" value="System Design">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="skills">Core Skills to Assess:</label>
+                        <div class="skills-input">
+                            <input type="text" id="skills" placeholder="Add a skill and press Enter">
+                            <button onclick="addSkill()">Add</button>
+                        </div>
+                        <div class="skills-tags" id="skillsTags">
+                            <span class="skill-tag">Problem Solving<button onclick="removeSkill(this)">×</button></span>
+                            <span class="skill-tag">Communication<button onclick="removeSkill(this)">×</button></span>
+                            <span class="skill-tag">Technical Knowledge<button onclick="removeSkill(this)">×</button></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>🎯 Prompt Templates</h3>
+                    <div class="form-group">
+                        <label for="promptType">Prompt Type:</label>
+                        <select id="promptType" onchange="loadPromptTemplate()">
+                            <option value="case_study">Case Study Prompt</option>
+                            <option value="behavioral">Behavioral Prompt</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="promptText">Prompt Template:</label>
+                        <textarea id="promptText" placeholder="Your prompt template will appear here..."></textarea>
+                    </div>
+                    
+                    <div class="controls">
+                        <button class="control-btn" onclick="savePrompt()">💾 Save Prompt</button>
+                        <button class="control-btn secondary" onclick="loadSavedPrompt()">📂 Load Saved</button>
+                        <button class="control-btn secondary" onclick="resetToDefault()">🔄 Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="panel">
+                    <h3>🧪 Test Your Prompt</h3>
+                    <div style="background: #e8f4fd; border: 1px solid #3498db; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <p style="margin: 0; color: #2c3e50; font-size: 14px;">
+                            <strong>⚠️ Backend Required:</strong> Make sure your FastAPI backend is running on <code>http://localhost:8000</code> 
+                            before testing. The tool will call your Gemini API through the backend.
+                        </p>
+                    </div>
+                    
+                    <button class="test-button" id="testBtn" onclick="testPrompt()">
+                        🚀 Generate Interview Structure
+                    </button>
+                    
+                    <div class="loading" id="loading">
+                        <div class="spinner"></div>
+                        <p>Generating interview structure with Gemini API...</p>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h3>📊 Results</h3>
+                    <div id="results" class="results" style="display: none;">
+                        <h4>Generated Interview Structure:</h4>
+                        <div id="jsonOutput" class="json-output"></div>
+                    </div>
+                    
+                    <div id="error" class="error" style="display: none;"></div>
+                    <div id="success" class="success" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Store skills array
+        let skills = ['Problem Solving', 'Communication', 'Technical Knowledge'];
+        
+        // Prompt templates
+        const promptTemplates = {
+            case_study: `You are an "Interview Bar Raiser" from a top-tier tech company. You have over 15 years of experience and are an expert at designing interview cases that rigorously test for first-principles thinking. 
+Your role is to create a sophisticated, machine-readable blueprint for a hyper-realistic and dynamic case study interview, including the necessary background information for the interviewer.
+
+**CONTEXT:**
+- Role: {role}
+- Seniority: {seniority}
+- Core Skills to Assess: {skills}
+- PRIMARY_FOCUS_SKILL: {PRIMARY_FOCUS_SKILL}
+
+**STYLISTIC GUIDANCE:**
+- Your design must be rooted in first-principles thinking. The goal is to assess the candidate's mental models, not just their knowledge.
+- Emulate the strategic depth of case studies from platforms like tryexponent.com.
+- **CRITICAL SAFETY INSTRUCTION:** Do NOT copy or replicate questions from any source. You must generate a novel, original case study.
+
+**PRIMARY DIRECTIVE:**
+Generate a complete and dynamic interview narrative. The central theme of your case study and the majority of the topics must be designed to assess the PRIMARY_FOCUS_SKILL. The case study must be precisely calibrated to the candidate's seniority level and must unfold in logical stages.
+
+**ANTI-PATTERNS TO AVOID:**
+- **Avoid Trivia:** Do not generate questions that rely on obscure knowledge. Focus on problem-solving.
+- **Avoid "Happy Path" Scenarios:** The \`coreProblem\` should be a genuine challenge with no obvious "correct" answer.
+
+**DESIGN PRINCIPLES:**
+1.  **The Narrative Arc:** Enforce a clear story-like progression using the \`stage\` field in each topic.
+2.  **Seniority Calibration:** The scope of the \`coreProblem\` MUST reflect the specified \`{seniority}\` (Junior: feature-level, Senior: product-level, Staff+: business-unit level).
+3.  **Dynamic Constraints:** Include a dynamic event only if it serves to test a core competency like adaptability.
+
+**OUTPUT SCHEMA:**
+Your response MUST be a single, valid JSON object with the following structure:
+
+{
+  "session_narrative": "<Generate a brief, 1-2 sentence project scenario to provide context>",
+  "case_study_details": {
+    "companyName": "<Generate a plausible, fictional tech company name>",
+    "companyDescription": "<Generate a brief description of the company's business>",
+    "appName": "<Generate a plausible, fictional application name>",
+    "userBase": "<Describe the primary user demographic for the app>",
+    "coreProblem": "<Generate a concise, challenging business or technical problem, SCOPED APPROPRIATELY FOR SENIORITY>",
+    "keyFeatures": ["<List 3-4 key features of the fictional application>"]
+  },
+  "topic_graph": [
+    {
+      "topic_id": "<Generate a unique ID string for this topic, prefixed with 'CS_'>",
+      "stage": "<Assign a stage to enforce narrative flow: 'Problem Definition' | 'Solution Brainstorming' | 'Execution & Risks'>",
+      "primary_skill": "<The main skill from the user's list that this topic assesses>",
+      "topic_name": "<Generate a short, descriptive name for this topic>",
+      "competency_assessed": "<Identify the primary professional competency this topic evaluates>",
+      "question_pattern": "<Generate a reusable, seniority-appropriate question pattern for this topic>",
+      "goal": "<Generate a concise description of the signal to capture from the candidate>",
+      "dependencies": ["<List of topic_ids that must precede this one, or an empty list []>"],
+      "probing_questions": [
+        "<Generate a sharp follow-up question to probe the candidate's initial answer for more depth>",
+        "<Generate another follow-up question that asks about trade-offs or alternative approaches>"
+      ]
+    }
+  ]
+}`,
+            
+            behavioral: `You are a Senior expert FAANG Interview Coach with more than 15 years of experience and Behavioral Science Expert. 
+Your role is to design a curriculum for a rigorous behavioral deep-dive interview that accurately assesses a candidate's core competencies against top-tier standards.
+
+**CONTEXT:**
+- Role: {role}
+- Seniority: {seniority}
+- Core Skills to Assess: {skills}
+
+**STYLISTIC GUIDANCE:**
+- Your design must be rooted in the STAR(L) method (Situation, Task, Action, Result, Learnings).
+- The goal is to elicit complete stories, not just claims. Every question should encourage the candidate to provide a specific, detailed example from their past.
+- Emulate the depth of questions from platforms like tryexponent and Leetcode.
+
+**PRIMARY DIRECTIVE:**
+Generate a topic graph for a behavioral deep-dive interview. 
+The central theme and the majority of the topics must be designed to assess the PRIMARY_FOCUS_SKILL: {PRIMARY_FOCUS_SKILL}. 
+Use the other skills as secondary topics to build out the interview.
+Select a cohesive set of 3-5 core competencies relevant to the role and seniority. For each competency, create one primary question and a set of probing follow-up questions designed to fully explore a candidate's example story. You can choose between pure behavioral questions or a behavioral case study approach.
+
+**DESIGN PRINCIPLES:**
+1.  **Competency Framework:** Structure the interview around a set of professional values or leadership principles (e.g., Ownership, Bias for Action, Disagree and Commit, Customer Obsession).
+2.  **Seniority Calibration:** The scope of the questions and the expected stories MUST be calibrated to the \`{seniority}\` level.
+    - **Junior:** Stories about well-defined tasks and direct contributions.
+    - **Senior:** Stories involving ambiguity, influencing others, and cross-functional complexity.
+    - **Staff+:** Stories involving shaping strategy, mentoring others, and dealing with large-scale, systemic challenges.
+3.  **Probing for Depth:** For each primary question, generate 2-3 essential follow-up questions. These should be designed to deconstruct the candidate's story, asking about their specific role, the challenges they faced, the results, and what they learned.
+
+**OUTPUT SCHEMA:**
+Your response MUST be a single, valid JSON object with this structure. You can choose between two approaches:
+
+**APPROACH 1: Pure Behavioral Questions (Recommended for focused behavioral assessment)**
+{
+  "session_narrative": null,
+  "case_study_details": null,
+  "topic_graph": [
+    {
+      "topic_id": "<Generate a unique ID string for this topic, prefixed with 'BEH_'>",
+      "primary_skill": "<The main skill this topic assesses>",
+      "topic_name": "<The competency to assess, e.g., 'Ownership & Initiative'>",
+      "goal": "<A concise description of the signal to capture>",
+      "primary_question_pattern": "<Generate a seniority-calibrated 'Tell me about a time when...' style question pattern for this competency.>",
+      "probing_follow_ups": [
+        "<Generate a follow-up question to clarify the Situation/Task, e.g., 'What was the context here and what was your specific role?'>",
+        "<Generate a follow-up question to explore the Action, e.g., 'What were the biggest challenges you faced in that situation?'>",
+        "<Generate a follow-up question to understand the Result/Learnings, e.g., 'What was the measurable outcome, and what would you do differently next time?'>"
+      ]
+    }
+  ]
+}
+
+**APPROACH 2: Behavioral Case Study (Alternative for comprehensive assessment)**
+{
+  "session_narrative": "<Generate a brief, 1-2 sentence scenario or context for behavioral assessment>",
+  "case_study_details": {
+    "companyName": "<Generate a plausible, fictional company name>",
+    "companyDescription": "<Generate a brief description of the company's situation>",
+    "coreProblem": "<Generate a concise behavioral challenge or scenario>"
+  },
+  "topic_graph": [
+    {
+      "topic_id": "<Generate a unique ID string for this topic, prefixed with 'BEH_'>",
+      "primary_skill": "<The main skill this topic assesses>",
+      "topic_name": "<The competency to assess, e.g., 'Leadership in Crisis'>",
+      "goal": "<A concise description of the signal to capture>",
+      "primary_question_pattern": "<Generate a behavioral question pattern related to the case study scenario>",
+      "probing_follow_ups": [
+        "<Generate a follow-up question to explore the candidate's approach>",
+        "<Generate a follow-up question to understand their decision-making>",
+        "<Generate a follow-up question to assess their learning and growth>"
+      ]
+    }
+  ]
+}
+
+**IMPORTANT:** 
+- Choose the approach that best fits the skills being assessed
+- For pure behavioral skills, use Approach 1
+- For applied behavioral skills in specific contexts, use Approach 2
+- The \`topic_graph\` array must contain at least 3-5 behavioral topics`
+        };
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPromptTemplate();
+            updateSkillsTags();
+        });
+
+        // Load prompt template based on selection
+        function loadPromptTemplate() {
+            const promptType = document.getElementById('promptType').value;
+            document.getElementById('promptText').value = promptTemplates[promptType];
+        }
+
+        // Add skill to the list
+        function addSkill() {
+            const input = document.getElementById('skills');
+            const skill = input.value.trim();
+            
+            if (skill && !skills.includes(skill)) {
+                skills.push(skill);
+                updateSkillsTags();
+                input.value = '';
+            }
+        }
+
+        // Remove skill from the list
+        function removeSkill(button) {
+            const skillTag = button.parentElement;
+            const skill = skillTag.textContent.replace('×', '');
+            skills = skills.filter(s => s !== skill);
+            updateSkillsTags();
+        }
+
+        // Update skills tags display
+        function updateSkillsTags() {
+            const container = document.getElementById('skillsTags');
+            container.innerHTML = '';
+            
+            skills.forEach(skill => {
+                const tag = document.createElement('span');
+                tag.className = 'skill-tag';
+                tag.innerHTML = `${skill}<button onclick="removeSkill(this)">×</button>`;
+                container.appendChild(tag);
+            });
+        }
+
+        // Test the prompt
+        async function testPrompt() {
+            const testBtn = document.getElementById('testBtn');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+            
+            // Hide previous results
+            results.style.display = 'none';
+            error.style.display = 'none';
+            success.style.display = 'none';
+            
+            // Show loading
+            testBtn.disabled = true;
+            loading.style.display = 'block';
+            
+            try {
+                // Get form values
+                const role = document.getElementById('role').value;
+                const seniority = document.getElementById('seniority').value;
+                const primarySkill = document.getElementById('primarySkill').value;
+                const promptText = document.getElementById('promptText').value;
+                
+                // Replace placeholders in prompt
+                const processedPrompt = promptText
+                    .replace(/{role}/g, role)
+                    .replace(/{seniority}/g, seniority)
+                    .replace(/{skills}/g, skills.join(', '))
+                    .replace(/{PRIMARY_FOCUS_SKILL}/g, primarySkill);
+                
+                // Call the actual Gemini API through your backend
+                const response = await callGeminiAPI(processedPrompt, role, seniority, skills);
+                
+                // Display results
+                document.getElementById('jsonOutput').textContent = JSON.stringify(response, null, 2);
+                results.style.display = 'block';
+                success.style.display = 'block';
+                success.textContent = '✅ Interview structure generated successfully!';
+                
+            } catch (err) {
+                error.style.display = 'block';
+                error.textContent = `❌ Error: ${err.message}`;
+            } finally {
+                loading.style.display = 'none';
+                testBtn.disabled = false;
+            }
+        }
+
+        // Call the actual Gemini API through your backend
+        async function callGeminiAPI(prompt, role, seniority, skills) {
+            try {
+                // Call your FastAPI backend endpoint
+                const response = await fetch('/create-interview-plan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        role: role,
+                        seniority: seniority,
+                        skills: skills,
+                        custom_prompt: prompt  // Pass the custom prompt for testing
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                // Check if the response contains the expected structure
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                
+                // Return the AI-generated interview plan
+                return result;
+                
+            } catch (error) {
+                console.error('API call failed:', error);
+                throw new Error(`Failed to generate interview structure: ${error.message}`);
+            }
+        }
+
+        // Save prompt to localStorage
+        function savePrompt() {
+            const promptType = document.getElementById('promptType').value;
+            const promptText = document.getElementById('promptText').value;
+            
+            const savedPrompts = JSON.parse(localStorage.getItem('savedPrompts') || '{}');
+            savedPrompts[promptType] = promptText;
+            localStorage.setItem('savedPrompts', JSON.stringify(savedPrompts));
+            
+            showMessage('Prompt saved successfully!', 'success');
+        }
+
+        // Load saved prompt from localStorage
+        function loadSavedPrompt() {
+            const promptType = document.getElementById('promptType').value;
+            const savedPrompts = JSON.parse(localStorage.getItem('savedPrompts') || '{}');
+            
+            if (savedPrompts[promptType]) {
+                document.getElementById('promptText').value = savedPrompts[promptType];
+                showMessage('Saved prompt loaded!', 'success');
+            } else {
+                showMessage('No saved prompt found for this type.', 'error');
+            }
+        }
+
+        // Reset to default prompt
+        function resetToDefault() {
+            loadPromptTemplate();
+            showMessage('Reset to default prompt!', 'success');
+        }
+
+        // Show temporary message
+        function showMessage(message, type) {
+            const success = document.getElementById('success');
+            const error = document.getElementById('error');
+            
+            if (type === 'success') {
+                success.style.display = 'block';
+                success.textContent = message;
+                setTimeout(() => success.style.display = 'none', 3000);
+            } else {
+                error.style.display = 'block';
+                error.textContent = message;
+                setTimeout(() => error.style.display = 'none', 3000);
+            }
+        }
+
+        // Handle Enter key in skills input
+        document.getElementById('skills').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addSkill();
+            }
+        });
+    </script>
+</body>
+</html>

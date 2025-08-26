@@ -882,13 +882,19 @@
                 let statusText = 'Missing';
                 
                 if (fieldInfo.present) {
-                    if (fieldInfo.type === 'string' && fieldInfo.value) {
+                    if (fieldInfo.type === 'string') {
                         statusClass = 'present';
                         statusText = 'Present';
                     } else if (fieldInfo.type === 'number') {
                         statusClass = 'present';
                         statusText = 'Present';
-                    } else if (Array.isArray(fieldInfo.value) && fieldInfo.value.length > 0) {
+                    } else if (Array.isArray(fieldInfo.value)) {
+                        statusClass = 'present';
+                        statusText = 'Present';
+                    } else if (fieldInfo.type === 'boolean') {
+                        statusClass = 'present';
+                        statusText = 'Present';
+                    } else if (fieldInfo.type === 'object' && fieldInfo.value !== null) {
                         statusClass = 'present';
                         statusText = 'Present';
                     } else {

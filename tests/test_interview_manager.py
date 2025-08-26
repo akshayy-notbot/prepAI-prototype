@@ -6,7 +6,7 @@ Run this to test the create_interview_plan_with_ai function
 
 import os
 from dotenv import load_dotenv
-from agents.interview_manager import create_interview_plan_with_ai, get_plan_summary, update_goal_status
+from agents.InterviewSessionService import create_interview_plan_with_ai, get_initial_plan_summary
 import json
 
 # Load environment variables
@@ -106,7 +106,7 @@ def test_ai_powered_interview_manager():
         test_plan = create_interview_plan_with_ai("Product Manager", "Senior", ["Product Sense"])
         
         if "error" not in test_plan:
-            summary = get_plan_summary(test_plan)
+            summary = get_initial_plan_summary(test_plan)
             print(f"✅ Summary generated successfully")
             print(f"✅ Role: {summary['role']}")
             print(f"✅ Seniority: {summary['seniority']}")
@@ -120,8 +120,8 @@ def test_ai_powered_interview_manager():
     except Exception as e:
         print(f"❌ Test 4 failed: {e}")
     
-    # Test 5: Goal status update
-    print("\n📝 Test 5: Goal Status Update")
+    # Test 5: Initial Plan Summary (Stateless)
+    print("\n📝 Test 5: Initial Plan Summary (Stateless)")
     print("-" * 40)
     
     try:
@@ -130,22 +130,16 @@ def test_ai_powered_interview_manager():
         
         if "error" not in test_plan:
             print(f"✅ Initial completed goals: {test_plan['completed_goals']}")
+            print(f"✅ Total goals: {test_plan['total_goals']}")
+            print(f"✅ Status: {test_plan['status']}")
             
-            # Update a goal status
-            if test_plan['goals']:
-                first_goal = test_plan['goals'][0]
-                updated_plan = update_goal_status(test_plan, first_goal['skill'], "completed")
-                print(f"✅ After update - completed goals: {updated_plan['completed_goals']}")
-                
-                # Check if the specific goal was updated
-                for goal in updated_plan['goals']:
-                    if goal['skill'] == first_goal['skill']:
-                        print(f"✅ Goal status updated to: {goal['status']}")
-                        break
-            else:
-                print("⚠️ No goals generated to test with")
+            # Get initial summary (no state changes)
+            summary = get_initial_plan_summary(test_plan)
+            print(f"✅ Summary generated successfully")
+            print(f"✅ Role: {summary['role']}")
+            print(f"✅ Seniority: {summary['seniority']}")
         else:
-            print(f"❌ Could not test goal update: {test_plan['error']}")
+            print(f"❌ Could not test plan summary: {test_plan['error']}")
                 
     except Exception as e:
         print(f"❌ Test 5 failed: {e}")

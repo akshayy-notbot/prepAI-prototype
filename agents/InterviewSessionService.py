@@ -367,7 +367,9 @@ class InterviewSessionService:
                     "description": topic.get("goal", ""),
                     "status": "pending",
                     "dependencies": topic.get("dependencies", []) if topic.get("dependencies") is not None else [],
-                    "keywords": topic.get("keywords_for_persona_agent", []) if topic.get("keywords_for_persona_agent") is not None else [],
+                    "keywords": topic.get("probing_questions", []) if topic.get("probing_questions") is not None else [],  # ✅ Updated to use new field
+                    "stage": topic.get("stage", "Problem Definition"),  # ✅ Added stage field
+                    "probing_questions": topic.get("probing_questions", []) if topic.get("probing_questions") is not None else [],  # ✅ Added probing questions
                     "probes_needed": 1,  # Default to 1 probe per topic
                     "difficulty": "intermediate"  # Default difficulty
                 })
@@ -400,6 +402,9 @@ class InterviewSessionService:
                 "archetype_confidence": confidence_score,
                 "suggested_skill_focus": suggested_focus,
                 "case_study_details": case_study_details,
+                
+                # NEW: Enhanced Case Study Features
+                "dynamic_events": ai_generated_plan.get("dynamic_events", []),
                 
                 # Legacy metadata for backward compatibility
                 "ai_generated_metadata": {
