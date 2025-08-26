@@ -321,21 +321,11 @@ class InterviewSessionService:
             else:
                 print(f"✅ AI generated a pure topic-based response")
             
-            # Validate topic_graph is a list and not empty
-            if not isinstance(ai_generated_plan["topic_graph"], list):
-                raise ValueError("topic_graph must be a list")
-            
-            if len(ai_generated_plan["topic_graph"]) == 0:
-                raise ValueError("topic_graph cannot be empty")
-            
-            print(f"✅ Response validation passed")
-            
             # Log the AI response structure for debugging
             print(f"🔍 AI response keys: {list(ai_generated_plan.keys())}")
             print(f"🔍 AI response structure: {ai_generated_plan}")
             
-            # Extract the topic graph and session narrative
-            topic_graph = ai_generated_plan.get("topic_graph", [])
+            # Extract the session narrative and case study details
             session_narrative = ai_generated_plan.get("session_narrative", "")
             case_study_details = ai_generated_plan.get("case_study_details", None)
             
@@ -345,12 +335,40 @@ class InterviewSessionService:
             if case_study_details is None:
                 case_study_details = {}
             
-            print(f"🔍 Topic graph length: {len(topic_graph)}")
             print(f"🔍 Session narrative length: {len(session_narrative)}")
             
-            # Validate that we have a meaningful topic graph
-            if not topic_graph or len(topic_graph) == 0:
-                raise ValueError("AI generated an empty topic graph")
+            # Since we removed topic_graph from the case study prompt, create a simple default structure
+            topic_graph = [
+                {
+                    "topic_id": "interview_start",
+                    "primary_skill": skills[0] if skills else "General Skills",
+                    "topic_name": "Interview Introduction",
+                    "goal": "Begin the interview and assess initial understanding",
+                    "stage": "Introduction",
+                    "dependencies": [],
+                    "probing_questions": ["Can you tell me more about your experience?", "What interests you about this role?"]
+                },
+                {
+                    "topic_id": "interview_mid",
+                    "primary_skill": skills[0] if skills else "General Skills", 
+                    "topic_name": "Core Assessment",
+                    "goal": "Evaluate key competencies and problem-solving approach",
+                    "stage": "Assessment",
+                    "dependencies": ["interview_start"],
+                    "probing_questions": ["How would you approach this problem?", "What alternatives did you consider?"]
+                },
+                {
+                    "topic_id": "interview_end",
+                    "primary_skill": skills[0] if skills else "General Skills",
+                    "topic_name": "Conclusion",
+                    "goal": "Wrap up and assess overall fit",
+                    "stage": "Conclusion", 
+                    "dependencies": ["interview_mid"],
+                    "probing_questions": ["Do you have any questions for me?", "What are your key takeaways?"]
+                }
+            ]
+            
+            print(f"✅ Created default topic graph with {len(topic_graph)} topics")
             
             # Transform topic graph into our standardized format
             goals = []

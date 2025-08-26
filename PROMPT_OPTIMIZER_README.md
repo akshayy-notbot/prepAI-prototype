@@ -13,11 +13,14 @@ A real-time tool for testing and optimizing your case study and behavioral inter
 
 ## 🚀 Quick Start
 
-### 1. Start Your Backend
+### 1. Backend Setup
 ```bash
-# Make sure your FastAPI backend is running
+# Option A: Local Development
 cd /path/to/your/PrepAI-Prototype
 python main.py
+
+# Option B: Use Render Deployment (Recommended)
+# Your backend is already running at: https://prepai-api.onrender.com
 ```
 
 ### 2. Open the Tool
@@ -42,8 +45,10 @@ open prompt_optimizer.html
 
 1. **Frontend**: HTML interface for prompt editing and testing
 2. **Backend**: FastAPI endpoint (`/create-interview-plan`) that calls Gemini API
-3. **AI Generation**: Your custom prompts are sent to Gemini through the backend
-4. **Real-time Results**: JSON interview structures are displayed immediately
+3. **Environment Detection**: Automatically detects local vs Render deployment
+4. **API Health Check**: Verifies backend connectivity before testing
+5. **AI Generation**: Your custom prompts are sent to Gemini through the backend
+6. **Real-time Results**: JSON interview structures are displayed immediately
 
 ## 📝 API Endpoint
 
@@ -96,8 +101,10 @@ POST /create-interview-plan
 ## 🔍 Troubleshooting
 
 ### Backend Not Running
-- Ensure your FastAPI server is running on `http://localhost:8000`
+- **Local Development**: Ensure your FastAPI server is running on `http://localhost:8000`
+- **Render Deployment**: Your backend is automatically available at `https://prepai-api.onrender.com`
 - Check console for any error messages
+- The tool automatically detects environment and shows API status
 
 ### API Errors
 - Verify your Gemini API key is configured

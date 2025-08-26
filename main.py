@@ -415,7 +415,6 @@ async def start_interview(request: StartInterviewRequest):
             first_question_result = persona_agent.process_user_response(
                 session_id=session_id,
                 user_answer="",  # No user answer for first question
-                topic_graph=topic_graph,
                 session_narrative=session_narrative,
                 interviewer_persona=interviewer_persona,
                 dynamic_events=plan.get("dynamic_events", [])
@@ -683,7 +682,6 @@ async def submit_answer(request: SubmitAnswerRequest):
             persona_result = persona_agent.process_user_response(
                 session_id=request.session_id,
                 user_answer=request.answer,
-                topic_graph=topic_graph,
                 session_narrative=session_narrative,
                 interviewer_persona=plan.get("persona", "Professional Interviewer"),
                 dynamic_events=plan.get("dynamic_events", [])

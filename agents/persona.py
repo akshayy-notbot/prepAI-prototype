@@ -62,7 +62,6 @@ class PersonaAgent:
     def process_user_response(self, 
                             session_id: str,
                             user_answer: str,
-                            topic_graph: List[Dict[str, Any]],
                             session_narrative: str,
                             interviewer_persona: str,
                             dynamic_events: List[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -77,7 +76,7 @@ class PersonaAgent:
             session_state = self._get_session_state(session_id)
             if not session_state:
                 # Initialize new session state
-                session_state = self._initialize_session_state(session_id, topic_graph)
+                session_state = self._initialize_session_state(session_id)
             
             # Step 2: Get case study details from Redis
             case_study_details = self._get_case_study_details(session_id)
@@ -99,7 +98,6 @@ class PersonaAgent:
             
             # Step 5: Generate response using unified prompt
             response_result = self._generate_unified_response(
-                topic_graph=topic_graph,
                 session_state=session_state,
                 case_study_details=case_study_details,
                 conversation_history=conversation_history,
@@ -111,7 +109,7 @@ class PersonaAgent:
             # Step 6: Update session state based on response
             if response_result.get("goal_achieved", False):
                 session_state = self._mark_topic_completed(session_id, session_state, session_state["current_topic_id"])
-                session_state = self._advance_to_next_topic(session_id, session_state, topic_graph)
+                session_state = self._advance_to_next_topic(session_id, session_state)
             
             # Step 7: Update conversation history
             session_state = self._update_conversation_history(
@@ -149,7 +147,6 @@ class PersonaAgent:
 
     
     def _generate_unified_response(self,
-                                 topic_graph: List[Dict[str, Any]],
                                  session_state: Dict[str, Any],
                                  case_study_details: Optional[Dict[str, Any]],
                                  conversation_history: List[Dict[str, Any]],
@@ -164,7 +161,6 @@ class PersonaAgent:
         
         # Prepare the unified prompt
         prompt = self._build_unified_prompt(
-            topic_graph=topic_graph,
             session_state=session_state,
             case_study_details=case_study_details,
             conversation_history=conversation_history,
@@ -207,7 +203,6 @@ class PersonaAgent:
             }
     
     def _build_unified_prompt(self,
-                             topic_graph: List[Dict[str, Any]],
                              session_state: Dict[str, Any],
                              case_study_details: Optional[Dict[str, Any]],
                              conversation_history: List[Dict[str, Any]],
@@ -238,23 +233,17 @@ class PersonaAgent:
         
         # Get current topic information for enhanced context
         current_topic_id = session_state.get('current_topic_id', '')
-        current_topic = None
-        if current_topic_id and topic_graph:
-            current_topic = next((t for t in topic_graph if t.get('topic_id') == current_topic_id), None)
-        
-        current_topic_text = "None" if not current_topic else json.dumps(current_topic, indent=2)
+        current_topic_text = "None"
         
         # Get stage progression context
         covered_topics = []
-        if topic_graph and session_state.get('covered_topic_ids'):
+        if session_state.get('covered_topic_ids'):
             for topic_id in session_state.get('covered_topic_ids', []):
-                topic = next((t for t in topic_graph if t.get('topic_id') == topic_id), None)
-                if topic:
-                    covered_topics.append({
-                        "topic_id": topic.get('topic_id'),
-                        "stage": topic.get('stage', 'Unknown'),
-                        "topic_name": topic.get('topic_name', 'Unknown')
-                    })
+                covered_topics.append({
+                    "topic_id": topic_id,
+                    "stage": "Interview Progress",
+                    "topic_name": "Interview Topic"
+                })
         
         stage_progression_text = json.dumps(covered_topics, indent=2) if covered_topics else "[]"
         
@@ -272,7 +261,7 @@ Your identity as Alex is permanent and must be reflected in every response.
 # ================================================================= # Interview Context & Tools for This Turn # ================================================================= 
 - Dynamic Events System: {dynamic_events_text}
 - Currently Triggered Event (if any): {triggered_event_text}
-- **Full Topic Graph:** {json.dumps(topic_graph, indent=2)}
+
 - **Current Topic Details:** {current_topic_text}
 - **Stage Progression (Covered Topics):** {stage_progression_text}
 - **Session State:** {{ "current_topic_id": "{current_topic_id}", "covered_topic_ids": {session_state.get('covered_topic_ids', [])} }}
@@ -403,13 +392,10 @@ Your primary task is to first complete the `chain_of_thought` array, which serve
         except Exception as e:
             print(f"Warning: Failed to mark event as triggered: {e}")
     
-    def _initialize_session_state(self, session_id: str, topic_graph: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _initialize_session_state(self, session_id: str) -> Dict[str, Any]:
         """Initialize new session state for a fresh interview"""
-        if not topic_graph or len(topic_graph) == 0:
-            raise ValueError("Cannot initialize session state with empty topic graph")
-        
         initial_state = {
-            "current_topic_id": topic_graph[0]["topic_id"] if topic_graph else None,
+            "current_topic_id": "interview_start",
             "covered_topic_ids": [],
             "conversation_history": [],
             "topic_progress": {},
@@ -417,14 +403,13 @@ Your primary task is to first complete the `chain_of_thought` array, which serve
             "last_updated": time.time()
         }
         
-        # Initialize topic progress
-        for topic in topic_graph:
-            initial_state["topic_progress"][topic["topic_id"]] = {
-                "status": "pending",
-                "attempts": 0,
-                "goal_achieved": False,
-                "qualitative_markers": []
-            }
+        # Initialize topic progress for a simple interview flow
+        initial_state["topic_progress"]["interview_start"] = {
+            "status": "pending",
+            "attempts": 0,
+            "goal_achieved": False,
+            "qualitative_markers": []
+        }
         
         return initial_state
     
@@ -473,26 +458,22 @@ Your primary task is to first complete the `chain_of_thought` array, which serve
         
         return session_state
     
-    def _advance_to_next_topic(self, session_id: str, session_state: Dict[str, Any], topic_graph: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Advance to the next available topic based on dependencies"""
+    def _advance_to_next_topic(self, session_id: str, session_state: Dict[str, Any]) -> Dict[str, Any]:
+        """Advance to the next available topic based on simple progression"""
         current_topic_id = session_state["current_topic_id"]
         covered_topic_ids = session_state.get("covered_topic_ids", [])
         
-        # Find next available topic
-        for topic in topic_graph:
-            if (topic["topic_id"] not in covered_topic_ids and 
-                topic["topic_id"] != current_topic_id and
-                self._can_start_topic(topic, covered_topic_ids)):
-                
-                session_state["current_topic_id"] = topic["topic_id"]
-                break
+        # Simple topic progression without complex dependencies
+        if current_topic_id == "interview_start":
+            session_state["current_topic_id"] = "interview_mid"
+        elif current_topic_id == "interview_mid":
+            session_state["current_topic_id"] = "interview_end"
+        elif current_topic_id == "interview_end":
+            session_state["current_topic_id"] = "completed"
         
         return session_state
     
-    def _can_start_topic(self, topic: Dict[str, Any], covered_topic_ids: List[str]) -> bool:
-        """Check if a topic can be started based on its dependencies"""
-        dependencies = topic.get("dependencies", [])
-        return all(dep in covered_topic_ids for dep in dependencies)
+
     
     def _update_conversation_history(self, session_id: str, session_state: Dict[str, Any], user_answer: str, ai_response: str) -> Dict[str, Any]:
         """Update conversation history with new turn"""

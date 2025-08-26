@@ -28,29 +28,12 @@ Generate a complete and dynamic interview narrative. The central theme of your c
 Your response MUST be a single, valid JSON object with the following structure:
 
 {
-  "session_narrative": "<Generate a brief, 1-2 sentence project scenario to provide context>",
-  "case_study_details": {
-    "companyName": "<Generate a plausible, fictional tech company name>",
-    "companyDescription": "<Generate a brief description of the company's business>",
-    "appName": "<Generate a plausible, fictional application name>",
-    "userBase": "<Describe the primary user demographic for the app>",
-    "coreProblem": "<Generate a concise, challenging business or technical problem, SCOPED APPROPRIATELY FOR SENIORITY>",
-    "keyFeatures": ["<List 3-4 key features of the fictional application>"]
-  },
-  "topic_graph": [
-    {
-      "topic_id": "<Generate a unique ID string for this topic, prefixed with 'CS_'>",
-      "stage": "<Assign a stage to enforce narrative flow: 'Problem Definition' | 'Solution Brainstorming' | 'Execution & Risks'>",
-      "primary_skill": "<The main skill from the user's list that this topic assesses>",
-      "topic_name": "<Generate a short, descriptive name for this topic>",
-      "competency_assessed": "<Identify the primary professional competency this topic evaluates>",
-      "question_pattern": "<Generate a reusable, seniority-appropriate question pattern for this topic>",
-      "goal": "<Generate a concise description of the signal to capture from the candidate>",
-      "dependencies": ["<List of topic_ids that must precede this one, or an empty list []>"],
-      "probing_questions": [
-        "<Generate a sharp follow-up question to probe the candidate's initial answer for more depth>",
-        "<Generate another follow-up question that asks about trade-offs or alternative approaches>"
-      ]
-    }
-  ]
-}
+ "session_narrative": "<Generate a brief, 1-2 sentence project scenario to provide context>",
+ "case_study_details": {
+   "companyName": "<Generate a plausible, fictional tech company name>",
+   "companyDescription": "<Generate a brief description of the company's business>",
+   "appName": "<Generate a plausible, fictional application name>",
+   "userBase": "<Describe the primary user demographic for the app>",
+   "coreProblem": "<Generate a concise, challenging business or technical problem, SCOPED APPROPRIATELY FOR SENIORITY>",
+   "keyFeatures": ["<List 3-4 key features of the fictional application>"]
+ }}

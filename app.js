@@ -571,7 +571,14 @@ async function startInterview() {
 
     try {
         // Start the interview using the new orchestrator system
+        console.log('🚀 Calling startOrchestratorInterview...');
         const interviewResponse = await startOrchestratorInterview();
+        
+        console.log('🔍 DEBUG: startOrchestratorInterview returned:', interviewResponse);
+        console.log('🔍 DEBUG: interviewResponse type:', typeof interviewResponse);
+        console.log('🔍 DEBUG: interviewResponse keys:', interviewResponse ? Object.keys(interviewResponse) : 'null/undefined');
+        console.log('🔍 DEBUG: interviewResponse.session_id:', interviewResponse ? interviewResponse.session_id : 'null/undefined');
+        console.log('🔍 DEBUG: Full interviewResponse object:', JSON.stringify(interviewResponse, null, 2));
         
         if (interviewResponse && interviewResponse.session_id) {
             sessionId = interviewResponse.session_id;
@@ -594,11 +601,20 @@ async function startInterview() {
             }
             
         } else {
+            console.error('❌ DEBUG: interviewResponse validation failed');
+            console.error('❌ DEBUG: interviewResponse exists:', !!interviewResponse);
+            console.error('❌ DEBUG: interviewResponse.session_id exists:', interviewResponse ? !!interviewResponse.session_id : false);
+            console.error('❌ DEBUG: interviewResponse.session_id value:', interviewResponse ? interviewResponse.session_id : 'N/A');
             throw new Error('Failed to start interview - no session ID received');
         }
 
     } catch (error) {
         console.error('❌ Error starting interview:', error);
+        console.error('❌ Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+        });
         displayErrorMessage('Could not start the interview. Please try again.');
         hideQuestionLoading();
     }
@@ -673,10 +689,25 @@ async function startOrchestratorInterview() {
     console.log('🔧 Debug: API_BASE_URL =', API_BASE_URL);
     console.log('🔧 Debug: window.PREPAI_CONFIG =', window.PREPAI_CONFIG);
     console.log('🔧 Debug: Full config object =', window.PREPAI_CONFIG_FULL);
+    console.log('🔍 DEBUG: Environment check - NODE_ENV:', process.env.NODE_ENV);
+    console.log('🔍 DEBUG: Environment check - typeof window:', typeof window);
+    console.log('🔍 DEBUG: Environment check - window.location:', window.location.href);
     
     try {
         console.log('🚀 Starting orchestrator interview with config:', interviewConfig);
+        console.log('🔍 DEBUG: interviewConfig type:', typeof interviewConfig);
+        console.log('🔍 DEBUG: interviewConfig keys:', Object.keys(interviewConfig));
+        console.log('🔍 DEBUG: interviewConfig.role:', interviewConfig.role);
+        console.log('🔍 DEBUG: interviewConfig.seniority:', interviewConfig.seniority);
+        console.log('🔍 DEBUG: interviewConfig.skills:', interviewConfig.skills);
         console.log('🚀 Using API endpoint:', `${API_BASE_URL}/api/start-interview`);
+        
+        console.log('🔍 DEBUG: Sending request to:', `${API_BASE_URL}/api/start-interview`);
+        console.log('🔍 DEBUG: Request payload:', {
+            role: interviewConfig.role,
+            seniority: interviewConfig.seniority,
+            skills: interviewConfig.skills
+        });
         
         const response = await fetch(`${API_BASE_URL}/api/start-interview`, {
             method: 'POST',
@@ -688,14 +719,22 @@ async function startOrchestratorInterview() {
             })
         });
 
+        console.log('🔍 DEBUG: Response status:', response.status);
+        console.log('🔍 DEBUG: Response headers:', Object.fromEntries(response.headers.entries()));
+        console.log('🔍 DEBUG: Response ok:', response.ok);
+
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ Response error text:', errorText);
+            console.error('❌ Response status:', response.status);
             throw new Error(`Server responded with ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
         console.log('✅ Interview started successfully:', data);
+        console.log('🔍 DEBUG: Response data type:', typeof data);
+        console.log('🔍 DEBUG: Response data keys:', Object.keys(data));
+        console.log('🔍 DEBUG: Response data.session_id:', data.session_id);
         
         return data;
 

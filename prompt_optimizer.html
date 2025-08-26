@@ -369,10 +369,10 @@
             <div class="right-panel">
                 <div class="panel">
                     <h3>🧪 Test Your Prompt</h3>
-                    <div style="background: #e8f4fd; border: 1px solid #3498db; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                    <div id="environmentInfo" style="background: #e8f4fd; border: 1px solid #3498db; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
                         <p style="margin: 0; color: #2c3e50; font-size: 14px;">
-                            <strong>⚠️ Backend Required:</strong> Make sure your FastAPI backend is running on <code>http://localhost:8000</code> 
-                            before testing. The tool will call your Gemini API through the backend.
+                            <strong>🌐 Environment:</strong> <span id="envDisplay">Detecting...</span><br>
+                            <strong>🔗 API Endpoint:</strong> <span id="apiEndpoint">Loading...</span>
                         </p>
                     </div>
                     
@@ -548,6 +548,7 @@ Your response MUST be a single, valid JSON object with this structure. You can c
         document.addEventListener('DOMContentLoaded', function() {
             loadPromptTemplate();
             updateSkillsTags();
+            updateEnvironmentDisplay();
         });
 
         // Load prompt template based on selection
@@ -638,11 +639,39 @@ Your response MUST be a single, valid JSON object with this structure. You can c
             }
         }
 
-        // Call the actual Gemini API through your backend
+        // API configuration for local vs Render deployment
+        const API_CONFIG = {
+            local: {
+                baseUrl: 'http://localhost:8000',
+                endpoint: '/create-interview-plan'
+            },
+            production: {
+                baseUrl: 'https://prepai-api.onrender.com',
+                endpoint: '/create-interview-plan'
+            }
+        };
+
+        // Detect environment and set API config
+        function getApiConfig() {
+            const hostname = window.location.hostname;
+            if (hostname === 'localhost' || hostname === '127.0.0.1') {
+                return API_CONFIG.local;
+            } else {
+                return API_CONFIG.production;
+            }
+        }
+
+        // Call the actual Gemini API through your Render backend
         async function callGeminiAPI(prompt, role, seniority, skills) {
             try {
+                const apiConfig = getApiConfig();
+                const apiUrl = `${apiConfig.baseUrl}${apiConfig.endpoint}`;
+                
+                console.log(`🌐 Calling API at: ${apiUrl}`);
+                console.log(`🔍 Environment: ${getApiConfig() === API_CONFIG.local ? 'Local' : 'Render Production'}`);
+                
                 // Call your FastAPI backend endpoint
-                const response = await fetch('/create-interview-plan', {
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -656,7 +685,9 @@ Your response MUST be a single, valid JSON object with this structure. You can c
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    console.error(`❌ API Error: ${response.status} - ${errorText}`);
+                    throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
                 }
 
                 const result = await response.json();
@@ -665,6 +696,8 @@ Your response MUST be a single, valid JSON object with this structure. You can c
                 if (result.error) {
                     throw new Error(result.error);
                 }
+                
+                console.log('✅ API call successful:', result);
                 
                 // Return the AI-generated interview plan
                 return result;
@@ -719,6 +752,45 @@ Your response MUST be a single, valid JSON object with this structure. You can c
                 error.style.display = 'block';
                 error.textContent = message;
                 setTimeout(() => error.style.display = 'none', 3000);
+            }
+        }
+
+        // Update environment display
+        function updateEnvironmentDisplay() {
+            const apiConfig = getApiConfig();
+            const isLocal = apiConfig === API_CONFIG.local;
+            
+            document.getElementById('envDisplay').textContent = isLocal ? 'Local Development' : 'Render Production';
+            document.getElementById('apiEndpoint').textContent = `${apiConfig.baseUrl}${apiConfig.endpoint}`;
+            
+            // Update styling based on environment
+            const envInfo = document.getElementById('environmentInfo');
+            if (isLocal) {
+                envInfo.style.background = '#fff3cd';
+                envInfo.style.borderColor = '#ffc107';
+            } else {
+                envInfo.style.background = '#d1ecf1';
+                envInfo.style.borderColor = '#17a2b8';
+            }
+            
+            // Check API health
+            checkApiHealth(apiConfig.baseUrl);
+        }
+        
+        // Check if API is accessible
+        async function checkApiHealth(baseUrl) {
+            try {
+                const response = await fetch(`${baseUrl}/health`);
+                if (response.ok) {
+                    console.log('✅ API health check passed');
+                    document.getElementById('environmentInfo').style.borderColor = '#28a745';
+                } else {
+                    console.log('⚠️ API health check failed');
+                    document.getElementById('environmentInfo').style.borderColor = '#dc3545';
+                }
+            } catch (error) {
+                console.log('❌ API health check error:', error);
+                document.getElementById('environmentInfo').style.borderColor = '#dc3545';
             }
         }
 
