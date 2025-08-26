@@ -691,6 +691,7 @@ async function startOrchestratorInterview() {
     console.log('🔧 Debug: Full config object =', window.PREPAI_CONFIG_FULL);
     console.log('🔍 DEBUG: Environment check - typeof window:', typeof window);
     console.log('🔍 DEBUG: Environment check - window.location:', window.location.href);
+    console.log('🔍 DEBUG: Browser environment check completed');
     
     try {
         console.log('🚀 Starting orchestrator interview with config:', interviewConfig);
