@@ -689,7 +689,6 @@ async function startOrchestratorInterview() {
     console.log('🔧 Debug: API_BASE_URL =', API_BASE_URL);
     console.log('🔧 Debug: window.PREPAI_CONFIG =', window.PREPAI_CONFIG);
     console.log('🔧 Debug: Full config object =', window.PREPAI_CONFIG_FULL);
-    console.log('🔍 DEBUG: Environment check - NODE_ENV:', process.env.NODE_ENV);
     console.log('🔍 DEBUG: Environment check - typeof window:', typeof window);
     console.log('🔍 DEBUG: Environment check - window.location:', window.location.href);
     
