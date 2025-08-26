@@ -1,56 +1,3 @@
-// --- Global Error Handler ---
-window.addEventListener('error', function(event) {
-    console.error('❌ Global error caught:', event.error);
-    console.error('❌ Error details:', {
-        message: event.error?.message,
-        stack: event.error?.stack,
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno
-    });
-    
-    // If it's a process error, show a user-friendly message
-    if (event.error?.message?.includes('process is not defined')) {
-        console.error('❌ Process error detected - this suggests a Node.js reference in browser code');
-        // You could show a user-friendly error message here
-    }
-});
-
-// Test configuration function
-function testConfiguration() {
-    console.log('🧪 Testing configuration...');
-    console.log('🧪 window.PREPAI_CONFIG exists:', !!window.PREPAI_CONFIG);
-    console.log('🧪 BACKEND_URL:', BACKEND_URL);
-    console.log('🧪 WS_BASE_URL:', WS_BASE_URL);
-    console.log('🧪 window.location.hostname:', window.location.hostname);
-    console.log('🧪 window.location.protocol:', window.location.protocol);
-    
-    // Test if we can access the configuration
-    try {
-        if (window.PREPAI_CONFIG) {
-            console.log('🧪 PREPAI_CONFIG.API_BASE_URL:', window.PREPAI_CONFIG.API_BASE_URL);
-            console.log('🧪 PREPAI_CONFIG.ENVIRONMENT:', window.PREPAI_CONFIG.ENVIRONMENT);
-        }
-    } catch (error) {
-        console.error('❌ Error accessing PREPAI_CONFIG:', error);
-    }
-    
-    // Test if we can make a simple fetch request
-    try {
-        console.log('🧪 Testing fetch availability...');
-        if (typeof fetch === 'function') {
-            console.log('✅ Fetch is available');
-        } else {
-            console.error('❌ Fetch is not available');
-        }
-    } catch (error) {
-        console.error('❌ Error testing fetch:', error);
-    }
-}
-
-// Make test function available globally for debugging
-window.testConfiguration = testConfiguration;
-
 // --- Global State ---
 let interviewId = null;
 let sessionId = null;  // Store session ID from backend
@@ -87,31 +34,15 @@ function showScreen(screenKey) {
 
 // --- Configuration ---
 // Use configuration from config.js with fallback
-let BACKEND_URL = 'https://prepai-api.onrender.com'; // Default fallback
-let WS_BASE_URL = 'wss://prepai-api.onrender.com'; // Default fallback
+const BACKEND_URL = window.PREPAI_CONFIG?.API_BASE_URL || 'https://prepai-api.onrender.com';
+const WS_BASE_URL = window.PREPAI_CONFIG?.WS_BASE_URL || 'wss://prepai-api.onrender.com';
 
-// Wait for configuration to be loaded
-function initializeConfiguration() {
-    try {
-        // Check if config is available
-        if (window.PREPAI_CONFIG && window.PREPAI_CONFIG.API_BASE_URL) {
-            BACKEND_URL = window.PREPAI_CONFIG.API_BASE_URL;
-            WS_BASE_URL = window.PREPAI_CONFIG.WS_BASE_URL || 'wss://prepai-api.onrender.com';
-            console.log('🔧 Configuration loaded from config.js');
-        } else {
-            console.warn('⚠️ Configuration not loaded, using fallback values');
-        }
-        
-        console.log('🔧 Final configuration:', {
-            BACKEND_URL,
-            WS_BASE_URL,
-            PREPAI_CONFIG: window.PREPAI_CONFIG
-        });
-    } catch (error) {
-        console.error('❌ Error initializing configuration:', error);
-        console.log('🔧 Using fallback configuration');
-    }
-}
+// Log configuration for debugging
+console.log('🔧 Configuration loaded:', {
+    BACKEND_URL,
+    WS_BASE_URL,
+    PREPAI_CONFIG: window.PREPAI_CONFIG
+});
 
 // Configuration validation function
 function validateConfiguration() {
@@ -138,18 +69,11 @@ function validateConfiguration() {
     }
 }
 
-// Initialize configuration when DOM is ready
+// Run configuration validation when page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        initializeConfiguration();
-        validateConfiguration();
-        testConfiguration(); // Test configuration for debugging
-    });
+    document.addEventListener('DOMContentLoaded', validateConfiguration);
 } else {
-    // DOM is already loaded
-    initializeConfiguration();
     validateConfiguration();
-    testConfiguration(); // Test configuration for debugging
 }
 
 
@@ -623,28 +547,6 @@ document.getElementById('start-interview-btn').addEventListener('click', startIn
 // 5. endInterview() -> calls /api/interviews/{id}/complete -> shows analysis
 
 async function startInterview() {
-    console.log('🚀 Starting interview...');
-    
-    // Ensure configuration is loaded before proceeding
-    if (!window.PREPAI_CONFIG || !BACKEND_URL) {
-        console.log('⏳ Configuration not ready, waiting...');
-        await new Promise(resolve => setTimeout(resolve, 100)); // Small delay
-        initializeConfiguration();
-        
-        if (!window.PREPAI_CONFIG || !BACKEND_URL) {
-            console.error('❌ Configuration still not ready after retry');
-            displayErrorMessage('Configuration error. Please refresh the page and try again.');
-            return;
-        }
-    }
-    
-    // Validate interview configuration
-    if (!interviewConfig.role || !interviewConfig.seniority || !interviewConfig.skills) {
-        console.error('❌ Interview configuration incomplete:', interviewConfig);
-        displayErrorMessage('Please complete the interview setup first.');
-        return;
-    }
-    
     showScreen('interview');
     
     // Start the timer
@@ -669,14 +571,7 @@ async function startInterview() {
 
     try {
         // Start the interview using the new orchestrator system
-        console.log('🚀 Calling startOrchestratorInterview...');
         const interviewResponse = await startOrchestratorInterview();
-        
-        console.log('🔍 DEBUG: startOrchestratorInterview returned:', interviewResponse);
-        console.log('🔍 DEBUG: interviewResponse type:', typeof interviewResponse);
-        console.log('🔍 DEBUG: interviewResponse keys:', interviewResponse ? Object.keys(interviewResponse) : 'null/undefined');
-        console.log('🔍 DEBUG: interviewResponse.session_id:', interviewResponse ? interviewResponse.session_id : 'null/undefined');
-        console.log('🔍 DEBUG: Full interviewResponse object:', JSON.stringify(interviewResponse, null, 2));
         
         if (interviewResponse && interviewResponse.session_id) {
             sessionId = interviewResponse.session_id;
@@ -699,20 +594,11 @@ async function startInterview() {
             }
             
         } else {
-            console.error('❌ DEBUG: interviewResponse validation failed');
-            console.error('❌ DEBUG: interviewResponse exists:', !!interviewResponse);
-            console.error('❌ DEBUG: interviewResponse.session_id exists:', interviewResponse ? !!interviewResponse.session_id : false);
-            console.error('❌ DEBUG: interviewResponse.session_id value:', interviewResponse ? interviewResponse.session_id : 'N/A');
             throw new Error('Failed to start interview - no session ID received');
         }
 
     } catch (error) {
         console.error('❌ Error starting interview:', error);
-        console.error('❌ Error details:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack
-        });
         displayErrorMessage('Could not start the interview. Please try again.');
         hideQuestionLoading();
     }
@@ -779,12 +665,6 @@ async function generateQuestionsWithGemini() {
 }
 
 async function startOrchestratorInterview() {
-    // Ensure configuration is loaded
-    if (!BACKEND_URL || BACKEND_URL === 'https://prepai-api.onrender.com') {
-        console.warn('⚠️ Configuration may not be loaded, reinitializing...');
-        initializeConfiguration();
-    }
-    
     const API_BASE_URL = BACKEND_URL;
     
     // Debug logging to see exactly what URLs are being used
@@ -793,25 +673,10 @@ async function startOrchestratorInterview() {
     console.log('🔧 Debug: API_BASE_URL =', API_BASE_URL);
     console.log('🔧 Debug: window.PREPAI_CONFIG =', window.PREPAI_CONFIG);
     console.log('🔧 Debug: Full config object =', window.PREPAI_CONFIG_FULL);
-    console.log('🔍 DEBUG: Environment check - typeof window:', typeof window);
-    console.log('🔍 DEBUG: Environment check - window.location:', window.location.href);
-    console.log('🔍 DEBUG: Browser environment check completed');
     
     try {
         console.log('🚀 Starting orchestrator interview with config:', interviewConfig);
-        console.log('🔍 DEBUG: interviewConfig type:', typeof interviewConfig);
-        console.log('🔍 DEBUG: interviewConfig keys:', Object.keys(interviewConfig));
-        console.log('🔍 DEBUG: interviewConfig.role:', interviewConfig.role);
-        console.log('🔍 DEBUG: interviewConfig.seniority:', interviewConfig.seniority);
-        console.log('🔍 DEBUG: interviewConfig.skills:', interviewConfig.skills);
         console.log('🚀 Using API endpoint:', `${API_BASE_URL}/api/start-interview`);
-        
-        console.log('🔍 DEBUG: Sending request to:', `${API_BASE_URL}/api/start-interview`);
-        console.log('🔍 DEBUG: Request payload:', {
-            role: interviewConfig.role,
-            seniority: interviewConfig.seniority,
-            skills: interviewConfig.skills
-        });
         
         const response = await fetch(`${API_BASE_URL}/api/start-interview`, {
             method: 'POST',
@@ -823,22 +688,14 @@ async function startOrchestratorInterview() {
             })
         });
 
-        console.log('🔍 DEBUG: Response status:', response.status);
-        console.log('🔍 DEBUG: Response headers:', Object.fromEntries(response.headers.entries()));
-        console.log('🔍 DEBUG: Response ok:', response.ok);
-
         if (!response.ok) {
             const errorText = await response.text();
             console.error('❌ Response error text:', errorText);
-            console.error('❌ Response status:', response.status);
             throw new Error(`Server responded with ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
         console.log('✅ Interview started successfully:', data);
-        console.log('🔍 DEBUG: Response data type:', typeof data);
-        console.log('🔍 DEBUG: Response data keys:', Object.keys(data));
-        console.log('🔍 DEBUG: Response data.session_id:', data.session_id);
         
         return data;
 

@@ -415,9 +415,11 @@ async def start_interview(request: StartInterviewRequest):
             first_question_result = persona_agent.process_user_response(
                 session_id=session_id,
                 user_answer="",  # No user answer for first question
+                topic_graph=topic_graph,
                 session_narrative=session_narrative,
                 interviewer_persona=interviewer_persona,
-                dynamic_events=plan.get("dynamic_events", [])
+                dynamic_events=plan.get("dynamic_events", []),
+                interviewer_briefing_doc=plan.get("interviewer_briefing_doc", {})
             )
             
             if not first_question_result.get("success", False):
@@ -481,7 +483,8 @@ async def start_interview(request: StartInterviewRequest):
             "case_study_details": plan.get("case_study_details", None),
             
             # NEW: Enhanced Case Study Features
-            "dynamic_events": plan.get("dynamic_events", [])
+            "dynamic_events": plan.get("dynamic_events", []),
+            "interviewer_briefing_doc": plan.get("interviewer_briefing_doc", {})
         }
         
         print(f"🎯 Interview session {session_id} started successfully!")
@@ -590,7 +593,8 @@ async def get_interview_status(session_id: str):
             "full_topic_graph": topic_graph,
             
             # NEW: Enhanced Case Study Features
-            "dynamic_events": plan.get("dynamic_events", [])
+            "dynamic_events": plan.get("dynamic_events", []),
+            "interviewer_briefing_doc": plan.get("interviewer_briefing_doc", {})
         }
         
         # Find next topic
@@ -682,9 +686,11 @@ async def submit_answer(request: SubmitAnswerRequest):
             persona_result = persona_agent.process_user_response(
                 session_id=request.session_id,
                 user_answer=request.answer,
+                topic_graph=topic_graph,
                 session_narrative=session_narrative,
                 interviewer_persona=plan.get("persona", "Professional Interviewer"),
-                dynamic_events=plan.get("dynamic_events", [])
+                dynamic_events=plan.get("dynamic_events", []),
+                interviewer_briefing_doc=plan.get("interviewer_briefing_doc", {})
             )
             
             if not persona_result.get("success", False):
@@ -692,16 +698,18 @@ async def submit_answer(request: SubmitAnswerRequest):
             
             new_ai_question = persona_result["response_text"]
             agent_used = persona_result.get("agent_used", "unified_persona")
+            turn_type = persona_result.get("turn_type", "MID_INTERVIEW")
             current_topic_id = persona_result.get("current_topic_id", "")
             covered_topic_ids = persona_result.get("covered_topic_ids", [])
             goal_achieved = persona_result.get("goal_achieved", False)
             
             print(f"✅ PersonaAgent generated response using {agent_used}")
+            print(f"📊 Turn type: {turn_type}")
             print(f"🎯 Current topic: {current_topic_id}")
             print(f"🎯 Goal achieved: {goal_achieved}")
             
-            # Check if interview is complete based on topic coverage
-            if current_topic_id == "completed" or len(covered_topic_ids) >= len(plan.get("topic_graph", [])):
+            # Check if interview is complete
+            if turn_type == "END_OF_INTERVIEW":
                 print("🎉 Interview completed by PersonaAgent!")
                 # Update plan status to completed
                 plan["status"] = "completed"
@@ -811,14 +819,15 @@ async def submit_answer(request: SubmitAnswerRequest):
             "agent_used": agent_used,
             "current_topic_id": current_topic_id if "current_topic_id" in locals() else "",
             "covered_topic_ids": covered_topic_ids if "covered_topic_ids" in locals() else [],
-            "turn_type": "MID_INTERVIEW",  # Simplified - no longer dynamic
+            "turn_type": turn_type if "turn_type" in locals() else "MID_INTERVIEW",
             
             # NEW: State Management Information
             "state_storage": "redis_only",  # All real-time state stays in Redis
             "postgresql_write": "none",  # No database writes during interview
             
             # NEW: Enhanced Case Study Features
-            "dynamic_events": plan.get("dynamic_events", [])
+            "dynamic_events": plan.get("dynamic_events", []),
+            "interviewer_briefing_doc": plan.get("interviewer_briefing_doc", {})
         }
         
         # Add PersonaAgent metrics if available
@@ -1240,54 +1249,9 @@ def test_celery_task():
         "status": "Task queued successfully"
     }
 
-@app.post("/create-interview-plan")
-def create_interview_plan_with_custom_prompt(request: dict):
-    """
-    Test endpoint for custom prompts - generates interview structure using Gemini API
-    """
-    try:
-        role = request.get("role", "Software Engineer")
-        seniority = request.get("seniority", "Senior")
-        skills = request.get("skills", ["Problem Solving"])
-        custom_prompt = request.get("custom_prompt", "")
-        
-        print(f"🧪 Testing custom prompt for {role} at {seniority} level")
-        print(f"🔍 Skills: {skills}")
-        print(f"📝 Custom prompt length: {len(custom_prompt)}")
-        
-        # Get Gemini client
-        model = get_gemini_client()
-        
-        # Use the custom prompt if provided, otherwise use default
-        if custom_prompt:
-            prompt = custom_prompt
-        else:
-            # Fallback to default prompt generation
-            from agents.InterviewSessionService import create_interview_plan_with_ai
-            result = create_interview_plan_with_ai(role, seniority, skills)
-            return result
-        
-        # Generate interview structure using custom prompt
-        print(f"🚀 Sending custom prompt to Gemini API...")
-        response = model.generate_content(prompt)
-        response_text = response.text.strip()
-        
-        # Clean up the response (remove markdown formatting if present)
-        if response_text.startswith('```json'):
-            response_text = response_text[7:]
-        if response_text.endswith('```'):
-            response_text = response_text[:-3]
-        
-        # Parse the JSON response
-        interview_structure = json.loads(response_text.strip())
-        
-        print(f"✅ Successfully generated interview structure")
-        
-        return interview_structure
-        
-    except Exception as e:
-        print(f"❌ Error testing custom prompt: {e}")
-        return {"error": f"Failed to test custom prompt: {str(e)}"}
+
+
+
 
 @app.get("/test-redis")
 def test_redis():
