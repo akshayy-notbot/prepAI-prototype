@@ -164,36 +164,41 @@ def run_startup_checks():
         print(f"❌ Failed to verify tables: {e}")
         return False
     
-    # Test new architecture components
-    print("\n🏗️ Testing new architecture components...")
+    # Test autonomous interviewer components
+    print("\n🏗️ Testing autonomous interviewer components...")
     try:
-        from agents.persona import PersonaAgent
+        from agents.autonomous_interviewer import AutonomousInterviewer
+        from agents.session_tracker import SessionTracker
         
-        # Test PersonaAgent initialization
-        persona_agent = PersonaAgent()
-        print("✅ PersonaAgent initialized successfully")
+        # Test component initialization
+        autonomous_interviewer = AutonomousInterviewer()
+        session_tracker = SessionTracker()
+        print("✅ Autonomous interviewer components initialized successfully")
         
-        # Test Redis session state operations
+        # Test session tracker operations
         test_session_id = "startup_test_session"
-        test_session_state = {
-            "current_topic_id": "topic_01",
-            "covered_topic_ids": [],
-            "conversation_history": [],
-            "created_at": time.time()
+        test_session_data = {
+            "role": "Software Engineer",
+            "seniority": "Senior",
+            "skill": "System Design"
         }
         
-        # Test session state operations
-        persona_agent._save_session_state(test_session_id, test_session_state)
-        retrieved_state = persona_agent._get_session_state(test_session_id)
+        # Test session creation
+        session_data = session_tracker.create_session(
+            session_id=test_session_id,
+            role=test_session_data["role"],
+            seniority=test_session_data["seniority"],
+            skill=test_session_data["skill"]
+        )
         
-        if retrieved_state and retrieved_state.get("current_topic_id") == "topic_01":
-            print("✅ Redis session state operations working")
+        if session_data and session_data.get("role") == "Software Engineer":
+            print("✅ Session tracker operations working")
         else:
-            print("❌ Redis session state operations failed")
+            print("❌ Session tracker operations failed")
             return False
         
         # Cleanup test session
-        persona_agent.redis_client.delete(f"session_state:{test_session_id}")
+        session_tracker.delete_session(test_session_id)
         print("✅ Architecture test cleanup successful")
         
     except Exception as e:
