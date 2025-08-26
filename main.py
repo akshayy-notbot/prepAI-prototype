@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import random
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -61,35 +63,14 @@ except Exception as e:
 # Import our new AI-powered interview components
 try:
     print("🔍 Importing agents.InterviewSessionService...")
-    from agents.InterviewSessionService import create_interview_plan
+    # Old import removed - now using autonomous interviewer
     print("✅ agents.InterviewSessionService imported successfully")
 except Exception as e:
     print(f"❌ Failed to import agents.InterviewSessionService: {e}")
     raise
 
-try:
-    print("🔍 Importing agents.archetype_selector...")
-    from agents.archetype_selector import select_interview_archetype
-    print("✅ agents.archetype_selector imported successfully")
-except Exception as e:
-    print(f"❌ Failed to import agents.archetype_selector: {e}")
-    raise
-
-try:
-    print("🔍 Importing agents.persona...")
-    from agents.persona import PersonaAgent
-    print("✅ agents.persona imported successfully")
-except Exception as e:
-    print(f"❌ Failed to import agents.persona: {e}")
-    raise
-
-try:
-    print("🔍 Importing agents.evaluation...")
-    from agents.evaluation import evaluate_answer
-    print("✅ agents.evaluation imported successfully")
-except Exception as e:
-    print(f"❌ Failed to import agents.evaluation: {e}")
-    raise
+# Old agent imports removed - now using autonomous interviewer
+print("✅ Using autonomous interviewer system")
 
 
 # --- FastAPI App Initialization ---
@@ -326,40 +307,32 @@ async def start_interview(request: StartInterviewRequest):
         print(f"🚀 Starting interview for {request.role} at {request.seniority} level")
         print(f"📚 Skills to practice: {', '.join(request.skills)}")
         
-        plan = create_interview_plan(
-            role=request.role,
-            seniority=request.seniority,
-            skills=request.skills
-        )
+        # Generate unique session ID
+        session_id = f"session_{int(time.time())}_{random.randint(1000, 9999)}"
+        print(f"✅ Generated session ID: {session_id}")
         
-        # Debug: Print plan information
-        print(f"🔍 Plan creation result: {type(plan)}")
-        if plan:
-            print(f"🔍 Plan keys: {list(plan.keys()) if isinstance(plan, dict) else 'Not a dict'}")
-        else:
-            print(f"🔍 Plan is None or falsy")
-        
-        # Check if plan creation failed or returned None
-        if not plan:
-            print(f"❌ Failed to create interview plan: plan is None")
-            return {"error": "Failed to create interview plan: plan is None"}, 500
-        
-        if "error" in plan:
-            print(f"❌ Failed to create interview plan: {plan['error']}")
-            return {"error": f"Failed to create interview plan: {plan['error']}"}, 500
-        
-        session_id = plan["session_id"]
-        print(f"✅ Interview plan created successfully. Session ID: {session_id}")
-        
-        # NEW: Extract topic_graph and session_narrative
-        topic_graph = plan.get("topic_graph", [])
-        session_narrative = plan.get("session_narrative", "")
-        
-        if not topic_graph:
-            return {"error": "Failed to generate topic graph for interview"}, 500
-        
-        print(f"📊 Topic graph generated with {len(topic_graph)} topics")
-        print(f"📖 Session narrative: {session_narrative[:100]}...")
+        # Step 2: Initialize Session Tracker and Autonomous Interviewer
+        try:
+            from agents.autonomous_interviewer import AutonomousInterviewer
+            from agents.session_tracker import SessionTracker
+            
+            # Initialize session tracker and autonomous interviewer
+            session_tracker = SessionTracker()
+            autonomous_interviewer = AutonomousInterviewer()
+            
+            # Create new session with simplified structure
+            session_data = session_tracker.create_session(
+                session_id=session_id,
+                role=request.role,
+                seniority=request.seniority,
+                skill=request.skills[0] if request.skills else "General"  # Focus on first skill
+            )
+            
+            print(f"✅ Session created successfully with autonomous interviewer")
+            
+        except Exception as session_error:
+            print(f"❌ Failed to create session: {session_error}")
+            return {"error": f"Failed to create interview session: {session_error}"}, 500
         
         # Step 2: Save the Plan to Redis (NEW: Includes topic_graph)
         try:
