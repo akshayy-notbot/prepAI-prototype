@@ -7,7 +7,7 @@ services:
     region: oregon
     ipAllowList: []
     
-  # Redis Service (for Celery and session management)
+  # Redis Service (for session management)
   - type: redis
     name: prepai-redis
     plan: free
@@ -37,28 +37,4 @@ services:
       - key: ENVIRONMENT
         value: production
     healthCheckPath: /health
-    autoDeploy: true
-
-   # Celery Worker for Background Tasks
-  - type: worker
-    name: prepai-celery-worker
-    env: python
-    region: oregon
-    plan: free
-    buildCommand: pip install -r requirements-render.txt
-    startCommand: celery -A celery_app worker --loglevel=info
-    envVars:
-      - key: PYTHON_VERSION
-        sync: false  # Use existing secret
-      - key: DATABASE_URL
-        sync: false  # Use existing secret
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: prepai-redis
-          property: connectionString
-      - key: GOOGLE_API_KEY
-        sync: false  # Use existing secret
-      - key: ENVIRONMENT
-        value: production
     autoDeploy: true
