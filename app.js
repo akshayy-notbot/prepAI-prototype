@@ -9,26 +9,138 @@ let interviewConfig = {}; // To store user selections
 let isWaitingForAI = false; // Track if we're waiting for AI response
 
 // --- Screen & Element References ---
-const screens = {
-    homepage: document.getElementById('homepage-screen'),
-    onboarding: document.getElementById('onboarding-screen'), // New: Single onboarding screen
-    dashboard: document.getElementById('dashboard-screen'),
-    interviewPrep: document.getElementById('interview-prep-screen'),
-    interview: document.getElementById('interview-screen'),
-    analysis: document.getElementById('analysis-screen'),
-    feedback: document.getElementById('feedback-screen'),
-};
+let screens = {}; // Will be initialized after DOM loads
+let chatInput, chatWindow, feedbackOutput, sendBtn; // Will be initialized after DOM loads
 
-const chatInput = document.getElementById('chat-input');
-const chatWindow = document.getElementById('chat-window');
-const feedbackOutput = document.getElementById('feedback-output');
-const sendBtn = document.getElementById('send-btn');
+// Initialize screens and other DOM elements after DOM loads
+function initializeScreens() {
+    screens = {
+        homepage: document.getElementById('homepage-screen'),
+        onboarding: document.getElementById('onboarding-screen'),
+        dashboard: document.getElementById('dashboard-screen'),
+        interviewPrep: document.getElementById('interview-prep-screen'),
+        interview: document.getElementById('interview-screen'),
+        analysis: document.getElementById('analysis-screen'),
+        feedback: document.getElementById('feedback-screen'),
+    };
+    
+    // Initialize other DOM elements
+    chatInput = document.getElementById('chat-input');
+    chatWindow = document.getElementById('chat-window');
+    feedbackOutput = document.getElementById('feedback-output');
+    sendBtn = document.getElementById('send-btn');
+    
+    console.log('✅ Screens initialized:', Object.keys(screens));
+    console.log('✅ DOM elements initialized:', {
+        chatInput: !!chatInput,
+        chatWindow: !!chatWindow,
+        feedbackOutput: !!feedbackOutput,
+        sendBtn: !!sendBtn
+    });
+    
+    // Setup event listeners after DOM elements are available
+    setupEventListeners();
+}
+
+// Setup all event listeners
+function setupEventListeners() {
+    // Start onboarding button
+    const startOnboardingBtn = document.getElementById('start-onboarding-btn');
+    if (startOnboardingBtn) {
+        startOnboardingBtn.addEventListener('click', () => {
+            console.log('🚀 Start onboarding button clicked!');
+            console.log('🔍 Current screens state:', screens);
+            console.log('🔍 Attempting to show onboarding screen...');
+            
+            showScreen('onboarding');
+            initializeOnboarding(); // Initialize the onboarding state
+            
+            console.log('✅ Onboarding screen should now be visible');
+        });
+        console.log('✅ Start onboarding button event listener added');
+    } else {
+        console.error('❌ Start onboarding button not found!');
+    }
+    
+    // Setup chat-related event listeners only if elements exist
+    if (sendBtn && chatInput) {
+        console.log('✅ Setting up chat event listeners...');
+        sendBtn.addEventListener('click', handleSubmitAnswer);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmitAnswer();
+            }
+        });
+        console.log('✅ Chat event listeners setup complete');
+    } else {
+        console.warn('⚠️ Chat elements not found, skipping chat event listeners');
+    }
+    
+    // Add debugging for exit button setup
+    const exitButton = document.getElementById('end-interview-btn');
+    if (exitButton) {
+        console.log('✅ Exit button found, adding event listener...');
+        exitButton.addEventListener('click', endInterview);
+        console.log('✅ Exit button event listener added successfully');
+    } else {
+        console.error('❌ Exit button not found! Element ID: end-interview-btn');
+        console.error('❌ Available elements with similar IDs:');
+        document.querySelectorAll('[id*="end"], [id*="exit"], [id*="interview"]').forEach(el => {
+            console.error('  -', el.id, el.tagName, el.className);
+        });
+    }
+    
+    console.log('✅ Event listeners setup complete');
+}
 
 // --- Helper Functions ---
 function showScreen(screenKey) {
-    Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+    if (Object.keys(screens).length === 0) {
+        console.error('❌ Screens not yet initialized. Please wait for DOM to load.');
+        return;
+    }
+    
+    if (!screens[screenKey]) {
+        console.error('❌ Screen not found:', screenKey);
+        return;
+    }
+    
+    // Clean up back buttons from all screens before switching
+    Object.values(screens).forEach(screen => {
+        if (screen) {
+            cleanupBackButton(screen);
+            screen.classList.add('hidden');
+        }
+    });
+    
     if (screens[screenKey]) {
         screens[screenKey].classList.remove('hidden');
+        
+        // Add back buttons based on current screen
+        switch (screenKey) {
+            case 'onboarding':
+                // Back to homepage
+                addBackButton(screens[screenKey], 'homepage');
+                break;
+            case 'dashboard':
+                // Back to onboarding
+                addBackButton(screens[screenKey], 'onboarding');
+                break;
+            case 'interviewPrep':
+                // Back to dashboard
+                addBackButton(screens[screenKey], 'dashboard');
+                break;
+            case 'interview':
+                // No back button during interview - prevent going back
+                break;
+            case 'analysis':
+                // No back button during analysis
+                break;
+            case 'feedback':
+                // No back button on feedback - can restart
+                break;
+        }
     }
 }
 
@@ -71,9 +183,15 @@ function validateConfiguration() {
 
 // Run configuration validation when page loads
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', validateConfiguration);
+    document.addEventListener('DOMContentLoaded', () => {
+        validateConfiguration();
+        initializeScreens();
+        showScreen('homepage'); // Show homepage after screens are initialized
+    });
 } else {
     validateConfiguration();
+    initializeScreens();
+    showScreen('homepage'); // Show homepage after screens are initialized
 }
 
 
@@ -170,12 +288,12 @@ function displayAIMessage(message) {
     }
 }
 
-// Enhanced addMessageToChat function (like your LLM code but with better styling)
+// Enhanced addMessageToChat function with WhatsApp-style layout
 function addMessageToChat(message, sender) {
     const messageDiv = document.createElement('div');
-    messageDiv.className = 'chat-message flex gap-4 mb-6';
+    messageDiv.className = 'chat-message flex gap-3 mb-4';
     
-    // Avatar and message alignment (like your LLM code)
+    // Avatar and message alignment
     if (sender === 'user') {
         messageDiv.classList.add('justify-end'); // Align user messages to the right
     } else {
@@ -198,7 +316,7 @@ function addMessageToChat(message, sender) {
         avatarDiv.innerHTML = `
             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center">
                 <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.6 73M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                 </svg>
             </div>
         `;
@@ -208,14 +326,20 @@ function addMessageToChat(message, sender) {
     const messageBubble = document.createElement('div');
     messageBubble.className = 'flex-grow';
     messageBubble.innerHTML = `
-        <div class="message-bubble p-4 rounded-xl ${sender === 'user' ? 'user' : 'ai'}">
+        <div class="message-bubble ${sender === 'user' ? 'user' : 'ai'}">
             <div class="message-content leading-relaxed">${message}</div>
-            <div class="message-meta text-xs text-gray-500 mt-3 font-mono">${new Date().toLocaleTimeString()}</div>
+            <div class="message-meta text-xs text-gray-500 mt-2 font-mono">${new Date().toLocaleTimeString()}</div>
         </div>
     `;
     
-    messageDiv.appendChild(avatarDiv);
-    messageDiv.appendChild(messageBubble);
+    // For user messages, put avatar after the message bubble
+    if (sender === 'user') {
+        messageDiv.appendChild(messageBubble);
+        messageDiv.appendChild(avatarDiv);
+    } else {
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(messageBubble);
+    }
     
     chatWindow.appendChild(messageDiv);
     chatWindow.scrollTop = chatWindow.scrollHeight;
@@ -237,8 +361,17 @@ function displayErrorMessage(message) {
         const retryBtn = messageElement.querySelector('.retry-btn');
         if (retryBtn) {
             retryBtn.addEventListener('click', () => {
-                // Remove the error message
-                messageElement.remove();
+                // Remove the error message - use proper DOM removal for cloned nodes
+                const messageContainer = retryBtn.closest('.message-container');
+                if (messageContainer) {
+                    messageContainer.remove();
+                } else {
+                    // Fallback: find the parent message element
+                    const parentMessage = retryBtn.closest('.chat-message');
+                    if (parentMessage) {
+                        parentMessage.remove();
+                    }
+                }
                 // Retry the last action
                 retryLastAction();
             });
@@ -262,19 +395,27 @@ function retryLastAction() {
 }
 
 function enableChatInput() {
-    userInput.disabled = false;
-    submitButton.disabled = false;
-    userInput.focus();
-    isWaitingForAI = false;
-    
-    // Update status
-    updateQuestionStatus('Ready for your answer');
+    if (chatInput && sendBtn) {
+        chatInput.disabled = false;
+        sendBtn.disabled = false;
+        chatInput.focus();
+        isWaitingForAI = false;
+        
+        // Update status
+        updateQuestionStatus('Ready for your answer');
+    } else {
+        console.warn('⚠️ Chat elements not available for enableChatInput');
+    }
 }
 
 function disableChatInput() {
-    userInput.disabled = true;
-    submitButton.disabled = true;
-    isWaitingForAI = true;
+    if (chatInput && sendBtn) {
+        chatInput.disabled = true;
+        sendBtn.disabled = true;
+        isWaitingForAI = true;
+    } else {
+        console.warn('⚠️ Chat elements not available for disableChatInput');
+    }
 }
 
 function updateQuestionStatus(status) {
@@ -317,18 +458,38 @@ function showInputLoadingState(type) {
 }
 
 // --- Enhanced Onboarding Flow ---
-document.getElementById('start-onboarding-btn').addEventListener('click', () => showScreen('onboarding'));
+// Event listeners are now set up in setupEventListeners() after DOM loads
 
-// Role selection handler
+// Handle role selection
 function handleRoleSelect(role) {
+    console.log('🎯 Role selected:', role);
     interviewConfig.role = role;
+    // Clear subsequent selections when role changes
+    interviewConfig.seniority = null;
+    interviewConfig.skills = [];
     updateOnboardingUI();
 }
 
-// Experience selection handler
+// Handle experience/seniority selection
 function handleExperienceSelect(level) {
+    console.log('🎯 Experience level selected:', level);
     interviewConfig.seniority = level;
+    // Clear skills when seniority changes
+    interviewConfig.skills = [];
     updateOnboardingUI();
+}
+
+// Reset onboarding state
+function resetOnboardingState() {
+    interviewConfig.role = null;
+    interviewConfig.seniority = null;
+    interviewConfig.skills = [];
+    updateOnboardingUI();
+}
+
+// Initialize onboarding state
+function initializeOnboarding() {
+    resetOnboardingState();
 }
 
 // Update the onboarding UI based on current selections
@@ -352,10 +513,16 @@ function updateOnboardingUI() {
                 btn.classList.add('selected');
             }
         });
+        
+        // Show experience section when role is selected
+        experienceSection.classList.remove('hidden');
     } else {
         roleSection.classList.remove('selected');
         roleSection.classList.add('unselected');
         document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('selected'));
+        
+        // Hide experience section when no role is selected
+        experienceSection.classList.add('hidden');
     }
     
     // Update experience section styling and enable/disable
@@ -374,42 +541,47 @@ function updateOnboardingUI() {
                     btn.classList.add('selected');
                 }
             });
+            
+            // Show skills section when seniority is selected
+            skillsSection.classList.remove('hidden');
         } else {
             experienceSection.classList.remove('selected');
             experienceSection.classList.add('unselected');
             document.querySelectorAll('.experience-btn').forEach(btn => btn.classList.remove('selected'));
+            
+            // Hide skills section when no seniority is selected
+            skillsSection.classList.add('hidden');
         }
     } else {
         experienceSection.classList.add('disabled');
         experienceSection.classList.remove('selected', 'unselected');
         document.querySelectorAll('.experience-btn').forEach(btn => btn.classList.remove('selected'));
+        
+        // Hide skills section when no role is selected
+        skillsSection.classList.add('hidden');
     }
     
     // Update skills section and show relevant skills
     if (interviewConfig.role && interviewConfig.seniority) {
-        skillsSection.classList.remove('hidden');
         // Initialize skills array if not already set
         if (!interviewConfig.skills) {
             interviewConfig.skills = [];
         }
         populateSkillsOptions();
         
-        // Sync checkbox states after populating
-        setTimeout(() => syncSkillCheckboxStates(), 0);
+        // No need to sync checkbox states - using brick selection now
         
-        if (interviewConfig.skills && interviewConfig.skills.length > 0) {
+        if (interviewConfig.skills && interviewConfig.skills.length === 1) {
             skillsSection.classList.add('selected');
             skillsSection.classList.remove('unselected');
         } else {
             skillsSection.classList.remove('selected');
             skillsSection.classList.add('unselected');
         }
-    } else {
-        skillsSection.classList.add('hidden');
     }
     
-    // Enable/disable continue button
-    if (interviewConfig.role && interviewConfig.seniority && interviewConfig.skills && interviewConfig.skills.length > 0) {
+    // Enable/disable continue button - require exactly one skill
+    if (interviewConfig.role && interviewConfig.seniority && interviewConfig.skills && interviewConfig.skills.length === 1) {
         continueBtn.disabled = false;
         continueBtn.classList.remove('opacity-50', 'cursor-not-allowed');
     } else {
@@ -421,79 +593,71 @@ function updateOnboardingUI() {
 function populateSkillsOptions() {
     const skillsContainer = document.getElementById('skills-options');
     const role = interviewConfig.role;
+    const seniority = interviewConfig.seniority;
     
-    // Define skills for each role
-    const roleSkills = {
-        'Product Manager': [
-            'Product Sense',
-            'User Research',
-            'Data Analysis',
-            'Strategic Thinking',
-            'Execution',
-            'Stakeholder Management',
-            'Metrics & KPIs',
-            'User Experience Design'
-        ],
-        'Software Engineer': [
-            'System Design',
-            'Algorithms & Data Structures',
-            'Code Quality',
-            'Testing & Debugging',
-            'Performance Optimization',
-            'Security',
-            'API Design',
-            'Database Design'
-        ],
-        'Data Analyst': [
-            'Data Visualization',
-            'Statistical Analysis',
-            'SQL & Data Querying',
-            'Business Intelligence',
-            'A/B Testing',
-            'Data Storytelling',
-            'Machine Learning Basics',
-            'Data Quality & Governance'
-        ]
-    };
-    
-    const skills = roleSkills[role] || [];
+    if (!role || !seniority) {
+        skillsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Please select a role and experience level first.</p>';
+        return;
+    }
+
+    const skills = getSkillsByRoleAndSeniority(role, seniority);
     
     skillsContainer.innerHTML = skills.map(skill => {
-        const isChecked = interviewConfig.skills && interviewConfig.skills.includes(skill);
-        const checkedAttr = isChecked ? 'checked' : '';
-        const labelClass = isChecked ? 'bg-blue-50 border border-blue-200' : '';
+        const isSelected = interviewConfig.skills && interviewConfig.skills.includes(skill);
+        const selectedClass = isSelected ? 'selected' : '';
+        
+        // Extract skill name and description for display
+        const skillName = skill.split(' (')[0];
+        const skillDescription = skill.includes('(') ? 
+            skill.substring(skill.indexOf('(') + 1, skill.lastIndexOf(')')) : '';
         
         return `
-            <label class="flex items-center space-x-3 cursor-pointer p-3 rounded-lg hover:bg-blue-50 transition-colors ${labelClass}">
-                <input type="checkbox" value="${skill}" class="skill-checkbox form-checkbox h-5 w-5 text-blue-600 rounded" ${checkedAttr}>
-                <span class="text-gray-700">${skill}</span>
-            </label>
+            <button type="button" 
+                    class="skill-brick choice-button p-4 bg-gray-100 rounded-lg text-left transition-all duration-200 ${selectedClass}" 
+                    data-skill="${skill}">
+                <h4 class="font-semibold text-gray-800">${skillName}</h4>
+                ${skillDescription ? `<p class="text-sm text-gray-600 mt-1">${skillDescription}</p>` : ''}
+            </button>
         `;
     }).join('');
     
-    // Add event listeners to all skill checkboxes
-    const skillCheckboxes = skillsContainer.querySelectorAll('.skill-checkbox');
-    skillCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            handleSkillToggle();
+    // Add event listeners to all skill bricks
+    const skillBricks = skillsContainer.querySelectorAll('.skill-brick');
+    skillBricks.forEach(brick => {
+        brick.addEventListener('click', function() {
+            handleSkillSelection(this.dataset.skill);
         });
     });
 }
 
-// Handle skill selection/deselection
-function handleSkillToggle() {
-    const selectedSkills = Array.from(document.querySelectorAll('#skills-options input:checked'))
-        .map(input => input.value);
-    interviewConfig.skills = selectedSkills;
+// Handle single skill selection
+function handleSkillSelection(selectedSkill) {
+    // Clear previous selection
+    document.querySelectorAll('.skill-brick').forEach(brick => {
+        brick.classList.remove('selected');
+    });
     
-    // Add visual feedback for selected skills
-    document.querySelectorAll('.skill-checkbox').forEach(checkbox => {
-        const label = checkbox.closest('label');
-        if (checkbox.checked) {
-            label.classList.add('bg-blue-50', 'border', 'border-blue-200');
-        } else {
-            label.classList.remove('bg-blue-50', 'border', 'border-blue-200');
-        }
+    // Select new skill
+    const selectedBrick = document.querySelector(`[data-skill="${selectedSkill}"]`);
+    if (selectedBrick) {
+        selectedBrick.classList.add('selected');
+    }
+    
+    // Extract skill name and description
+    const skillName = selectedSkill.split(' (')[0]; // Get the part before the first parenthesis
+    const skillDescription = selectedSkill.includes('(') ? 
+        selectedSkill.substring(selectedSkill.indexOf('(') + 1, selectedSkill.lastIndexOf(')')) : 
+        '';
+    
+    // Update config with both skill name and description
+    interviewConfig.skills = [selectedSkill]; // Keep full text for display
+    interviewConfig.selectedSkillName = skillName; // Clean skill name for API
+    interviewConfig.selectedSkillDescription = skillDescription; // Description for context
+    
+    console.log('🎯 Skill selected:', {
+        fullText: selectedSkill,
+        skillName: skillName,
+        skillDescription: skillDescription
     });
     
     updateOnboardingUI();
@@ -521,12 +685,17 @@ function syncSkillCheckboxStates() {
 
 // Continue to dashboard
 document.getElementById('onboarding-continue-btn').addEventListener('click', () => {
-    if (interviewConfig.role && interviewConfig.seniority && interviewConfig.skills && interviewConfig.skills.length > 0) {
+    if (interviewConfig.role && interviewConfig.seniority && interviewConfig.skills && interviewConfig.skills.length === 1) {
         showScreen('dashboard');
         
         // Update dashboard display
         document.getElementById('dashboard-role-company').textContent = `For a ${interviewConfig.role} role (${interviewConfig.seniority} level).`;
-        document.getElementById('key-skills-list').innerHTML = interviewConfig.skills.map(skill => `<li>${skill}</li>`).join('');
+        document.getElementById('key-skills-list').innerHTML = interviewConfig.skills.map(skill => {
+            const skillName = skill.split(' (')[0];
+            const skillDescription = skill.includes('(') ? 
+                skill.substring(skill.indexOf('(') + 1, skill.lastIndexOf(')')) : '';
+            return `<li><strong>${skillName}</strong>${skillDescription ? ` - ${skillDescription}` : ''}</li>`;
+        }).join('');
     }
 });
 
@@ -684,7 +853,12 @@ async function startOrchestratorInterview() {
             body: JSON.stringify({
                 role: interviewConfig.role,
                 seniority: interviewConfig.seniority,
-                skills: interviewConfig.skills
+                skills: interviewConfig.skills,
+                skill_context: {
+                    skill_name: interviewConfig.selectedSkillName,
+                    skill_description: interviewConfig.selectedSkillDescription,
+                    full_skill_text: interviewConfig.skills[0]
+                }
             })
         });
 
@@ -751,33 +925,38 @@ function displayUserMessage(message) {
 // which uses the cleaner, more standard approach from the LLM code
 
 async function endInterview() {
-    // Stop the timer
-    stopTimer();
-    
-    showScreen('analysis');
-
-    // Use the live Render backend URL
-    const API_BASE_URL = BACKEND_URL; 
+    console.log('🚪 Exit button clicked! Starting endInterview function...');
     
     try {
-        const response = await fetch(`${API_BASE_URL}/api/interviews/${interviewId}/complete`, {
+        // Stop the timer
+        console.log('⏱️ Stopping timer...');
+        stopTimer();
+        console.log('✅ Timer stopped successfully');
+        
+        console.log('📊 Showing analysis screen...');
+        showScreen('analysis');
+
+        // Use the live Render backend URL
+        const API_BASE_URL = BACKEND_URL; 
+        
+        console.log('🌐 Using API URL:', API_BASE_URL);
+        
+        console.log('📤 Sending completion request to backend...');
+        const response = await fetch(`${API_BASE_URL}/api/interview/${sessionId}/complete`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                transcript: transcript,
-                session_id: sessionId,  // Pass session ID for database tracking
-                role: interviewConfig.role,  // Pass role for context
-                seniority: interviewConfig.seniority,  // Pass seniority for context
-                skills: interviewConfig.skills  // Pass skills for context
-            })
+            headers: { 'Content-Type': 'application/json' }
         });
 
+        console.log('📥 Response received:', response.status, response.statusText);
+
         if (!response.ok) {
-            throw new Error('Analysis request failed');
+            throw new Error(`Analysis request failed: ${response.status} ${response.statusText}`);
         }
 
         const result = await response.json();
+        console.log('✅ Analysis completed successfully:', result);
 
+        console.log('📋 Interview completed! Showing feedback screen...');
         showScreen('feedback');
         
         // Format the feedback in a user-friendly way
@@ -788,6 +967,7 @@ async function endInterview() {
                     <div class="text-center">
                         <h3 class="text-2xl font-bold text-gray-900 mb-2">Interview Analysis Complete!</h3>
                         ${data.overall_score ? `<div class="text-4xl font-bold text-blue-600">${data.overall_score}/5</div>` : ''}
+                        <p class="text-gray-600 mt-2">${data.questions_evaluated} questions evaluated</p>
                     </div>
                     
                     ${data.overall_summary ? `
@@ -797,47 +977,40 @@ async function endInterview() {
                         </div>
                     ` : ''}
                     
-                    ${data.scores && data.scores.length > 0 ? `
+                    ${data.skills_assessed && data.skills_assessed.length > 0 ? `
                         <div class="bg-gray-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-gray-800 mb-3">Detailed Scores</h4>
-                            <div class="space-y-3">
-                                ${data.scores.map(score => `
-                                    <div class="flex justify-between items-start">
-                                        <div class="flex-1">
-                                            <div class="font-medium text-gray-700">${score.criterion}</div>
-                                            <div class="text-sm text-gray-600 mt-1">${score.justification}</div>
-                                        </div>
-                                        <div class="ml-4 text-2xl font-bold text-blue-600">${score.score}/5</div>
-                                    </div>
+                            <h4 class="font-semibold text-gray-800 mb-3">Skills Assessed</h4>
+                            <div class="flex flex-wrap gap-2">
+                                ${data.skills_assessed.map(skill => `
+                                    <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">${skill}</span>
                                 `).join('')}
                             </div>
                         </div>
                     ` : ''}
                     
-                    ${data.key_strengths && data.key_strengths.length > 0 ? `
-                        <div class="bg-green-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-green-800 mb-2">Key Strengths</h4>
-                            <ul class="list-disc list-inside text-green-700 space-y-1">
-                                ${data.key_strengths.map(strength => `<li>${strength}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                    
-                    ${data.areas_for_improvement && data.areas_for_improvement.length > 0 ? `
-                        <div class="bg-yellow-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-yellow-800 mb-2">Areas for Improvement</h4>
-                            <ul class="list-disc list-inside text-yellow-700 space-y-1">
-                                ${data.areas_for_improvement.map(area => `<li>${area}</li>`).join('')}
-                            </ul>
-                        </div>
-                    ` : ''}
-                    
-                    ${data.recommendations && data.recommendations.length > 0 ? `
-                        <div class="bg-purple-50 p-4 rounded-lg">
-                            <h4 class="font-semibold text-purple-800 mb-2">Recommendations</h4>
-                            <ul class="list-disc list-inside text-purple-700 space-y-1">
-                                ${data.recommendations.map(rec => `<li>${rec}</li>`).join('')}
-                            </ul>
+                    ${data.detailed_evaluations && data.detailed_evaluations.length > 0 ? `
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h4 class="font-semibold text-gray-800 mb-3">Detailed Question Analysis</h4>
+                            <div class="space-y-4">
+                                ${data.detailed_evaluations.map((qa, index) => `
+                                    <div class="border-l-4 border-blue-200 pl-4">
+                                        <div class="font-medium text-gray-800 mb-2">Question ${index + 1}: ${qa.question.substring(0, 100)}${qa.question.length > 100 ? '...' : ''}</div>
+                                        ${qa.evaluation && qa.evaluation.scores ? `
+                                            <div class="space-y-2">
+                                                ${Object.entries(qa.evaluation.scores).map(([skill, scoreData]) => `
+                                                    <div class="flex justify-between items-center text-sm">
+                                                        <span class="font-medium text-gray-700">${skill}</span>
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-lg font-bold text-blue-600">${scoreData.score}/5</span>
+                                                            <span class="text-xs text-gray-500">${scoreData.feedback.substring(0, 80)}${scoreData.feedback.length > 80 ? '...' : ''}</span>
+                                                        </div>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                        ` : '<div class="text-gray-500 text-sm">Evaluation data not available</div>'}
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                     ` : ''}
                     
@@ -849,44 +1022,54 @@ async function endInterview() {
                 </div>
             `;
         } else {
-            // Fallback to raw JSON if structure is unexpected
+            console.warn('⚠️ No data in result:', result);
             feedbackOutput.innerHTML = `
-                <h3 class="text-xl font-semibold">Analysis Complete!</h3>
-                <pre class="mt-4 p-4 bg-gray-100 rounded text-sm whitespace-pre-wrap">${JSON.stringify(result, null, 2)}</pre>
+                <div class="text-center">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Interview Completed</h3>
+                    <p class="text-gray-600 mb-6">Your interview has been completed successfully.</p>
+                    <button onclick="location.reload()" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
+                        Start a New Interview
+                    </button>
+                </div>
             `;
         }
-
+        
     } catch (error) {
-        console.error('❌ Analysis error:', error);
-        alert('Could not get analysis. Please try again.');
-        showScreen('interview');
+        console.error('❌ Error in endInterview:', error);
+        
+        // Show error message to user
+        feedbackOutput.innerHTML = `
+            <div class="text-center">
+                <h3 class="text-2xl font-bold text-red-600 mb-4">Error Completing Interview</h3>
+                <p class="text-gray-600 mb-6">There was an error completing your interview: ${error.message}</p>
+                <button onclick="location.reload()" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition duration-300">
+                    Start a New Interview
+                </button>
+            </div>
+        `;
+        
+        showScreen('feedback');
     }
 }
 
 // --- Event Listeners ---
-// Clean event listener setup (like LLM code)
-const submitButton = sendBtn; // Use existing reference
-const userInput = chatInput; // Use existing reference
-
-submitButton.addEventListener('click', handleSubmitAnswer);
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmitAnswer();
-    }
-});
-document.getElementById('end-interview-btn').addEventListener('click', endInterview);
+// Event listeners are now set up in setupEventListeners() after DOM loads
 
 // Clean, focused answer submission handler (best of both worlds)
 async function handleSubmitAnswer() {
-    const answerText = userInput.value.trim();
+    if (!chatInput) {
+        console.error('❌ Chat input not available');
+        return;
+    }
+    
+    const answerText = chatInput.value.trim();
     if (!answerText) return; // Don't send empty answers
 
     console.log('🚀 Submitting answer via orchestrator');
 
     // 1. Immediately display the user's answer in the chat (like LLM code)
     addMessageToChat(answerText, 'user');
-    userInput.value = ''; // Clear the input field
+    chatInput.value = ''; // Clear the input field
     
     // 2. Update transcript
     transcript.push({
@@ -898,8 +1081,8 @@ async function handleSubmitAnswer() {
     // 3. Show loading indicator and disable input (like LLM code + visual feedback)
     showInputLoadingState('processing');
     updateQuestionStatus('Processing your answer...');
-    userInput.disabled = true;
-    submitButton.disabled = true;
+    if (chatInput) chatInput.disabled = true;
+    if (sendBtn) sendBtn.disabled = true;
 
     // 4. Send the answer to the backend via HTTP POST (clean approach)
     try {
@@ -946,8 +1129,8 @@ async function handleSubmitAnswer() {
             console.error("Failed to submit answer. Status:", response.status, "Response:", errorText);
             addMessageToChat("Error: Could not submit answer.", 'system');
             // Re-enable input on error
-            userInput.disabled = false;
-            submitButton.disabled = false;
+            if (chatInput) chatInput.disabled = false;
+            if (sendBtn) sendBtn.disabled = false;
             hideInputLoadingStates();
         }
 
@@ -955,8 +1138,8 @@ async function handleSubmitAnswer() {
         console.error("Error submitting answer:", error);
         addMessageToChat("Error: Network issue. Please try again.", 'system');
         // Re-enable input on error
-        userInput.disabled = false;
-        submitButton.disabled = false;
+        if (chatInput) chatInput.disabled = false;
+        if (sendBtn) sendBtn.disabled = false;
         hideInputLoadingStates();
         updateQuestionStatus('Ready for your answer');
     }
@@ -973,5 +1156,126 @@ function restart() {
 // Make restart function globally accessible
 window.restart = restart;
 
+// --- Comprehensive Skills Mapping by Role and Seniority ---
+function getSkillsByRoleAndSeniority(role, seniority) {
+    const skillsMapping = {
+        'Product Manager': {
+            'Student/Intern': [
+                'Product Sense (Understand users, solve problems)',
+                'Execution (Analyze data, manage tasks)',
+                'Communication (Collaborate with the team)'
+            ],
+            'Junior / Mid-Level': [
+                'Product Sense (Design valuable user experiences)',
+                'Execution (Ship features, measure impact)',
+                'Strategic Thinking (Analyze market, build roadmap)',
+                'Leadership & Influence (Align team, manage stakeholders)'
+            ],
+            'Senior': [
+                'Product Sense (Define product area vision)',
+                'Execution (Lead complex, cross-team projects)',
+                'Strategic Thinking (Formulate winning product strategy)',
+                'Leadership & Influence (Influence roadmaps, mentor others)'
+            ],
+            'Manager / Lead': [
+                'Product Sense (Set org-wide design vision)',
+                'Execution (Scale operations, forecast business)',
+                'Strategic Thinking (Find new market opportunities)',
+                'Leadership & Influence (Align executives, drive change)'
+            ]
+        },
+        'Software Engineer': {
+            'Student/Intern': [
+                'Coding Fundamentals (Write clean, tested code)',
+                'Understanding Systems (Learn the existing codebase)',
+                'Team Collaboration (Respond to code reviews)'
+            ],
+            'Junior / Mid-Level': [
+                'CS Fundamentals in Practice (Apply algorithms, data structures)',
+                'Component-Level Design (Design APIs and databases)',
+                'Operational Health (Optimize and debug features)'
+            ],
+            'Senior': [
+                'System Design Leadership (Lead complex system designs)',
+                'Technical Leadership (Mentor engineers, drive decisions)',
+                'Strategic Implementation (Define team testing strategy)'
+            ],
+            'Manager / Lead': [
+                'System Architecture (Design multi-service platform architecture)',
+                'Technical Strategy (Set long-term technical vision)',
+                'Engineering Excellence (Drive org-wide quality standards)'
+            ]
+        },
+        'Data Analyst': {
+            'Student/Intern': [
+                'Technical Foundations (Query and clean data)',
+                'Analytical Basics (Perform simple statistical analysis)',
+                'Reporting (Populate dashboards with data)'
+            ],
+            'Junior / Mid-Level': [
+                'Technical Proficiency (Develop interactive BI dashboards)',
+                'Statistical Analysis (Analyze experiments, find insights)',
+                'Business Impact (Tell compelling stories with data)'
+            ],
+            'Senior': [
+                'Technical Depth (Optimize queries, build models)',
+                'Advanced Analytics (Design complex A/B tests)',
+                'Strategic Partnership (Define key business metrics)'
+            ],
+            'Manager / Lead': [
+                'Technical & Systems Thinking (Understand data engineering architecture)',
+                'Strategic Leadership (Own company-wide experimentation strategy)',
+                'Executive Communication & Influence (Drive leadership decisions with data)'
+            ]
+        }
+    };
+    
+    return skillsMapping[role]?.[seniority] || [];
+}
+
+// --- Back Button Functionality ---
+function addBackButton(screenElement, targetScreen) {
+    // Remove existing back button if any
+    const existingBackBtn = screenElement.querySelector('.back-btn');
+    if (existingBackBtn) {
+        existingBackBtn.remove();
+    }
+    
+    // Create back button with CSS-based positioning
+    const backBtn = document.createElement('button');
+    backBtn.className = 'back-btn flex items-center gap-2';
+    backBtn.innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+        </svg>
+        <span class="hidden sm:inline">Back</span>
+    `;
+    
+    backBtn.addEventListener('click', () => {
+        console.log('🔙 Back button clicked, navigating to:', targetScreen);
+        showScreen(targetScreen);
+    });
+    
+    // Add to screen
+    screenElement.appendChild(backBtn);
+    
+    // Debug logging
+    console.log('✅ Back button added to screen:', screenElement.id);
+    console.log('✅ Back button classes:', backBtn.className);
+    console.log('✅ Back button target screen:', targetScreen);
+}
+
+// Function to clean up back button event listeners
+function cleanupBackButton(screenElement) {
+    const backBtn = screenElement.querySelector('.back-btn');
+    if (backBtn) {
+        console.log('🧹 Cleaning up back button from screen:', screenElement.id);
+        // Remove the button completely
+        backBtn.remove();
+    } else {
+        console.log('ℹ️ No back button found to clean up on screen:', screenElement.id);
+    }
+}
+
 // --- Initial Load ---
-showScreen('homepage');
+// showScreen('homepage'); // This line is now moved to the DOMContentLoaded listener
