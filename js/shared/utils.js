@@ -195,72 +195,72 @@ const SkillsMapping = {
     getSkillsByRoleAndSeniority(role, seniority) {
         const skillsMapping = {
             'Product Manager': {
-                'Student/Intern': [
-                    'Product Sense (Understand users, solve problems)',
-                    'Execution (Analyze data, manage tasks)',
-                    'Communication (Collaborate with the team)'
+                'Junior': [
+                    'Product Sense',
+                    'Execution',
+                    'Communication'
                 ],
-                'Junior / Mid-Level': [
-                    'Product Sense (Design valuable user experiences)',
-                    'Execution (Ship features, measure impact)',
-                    'Strategic Thinking (Analyze market, build roadmap)',
-                    'Leadership & Influence (Align team, manage stakeholders)'
+                'Mid': [
+                    'Product Sense',
+                    'Execution',
+                    'Strategic Thinking',
+                    'Leadership & Influence'
                 ],
                 'Senior': [
-                    'Product Sense (Define product area vision)',
-                    'Execution (Lead complex, cross-team projects)',
-                    'Strategic Thinking (Formulate winning product strategy)',
-                    'Leadership & Influence (Influence roadmaps, mentor others)'
+                    'Product Sense',
+                    'Execution',
+                    'Strategic Thinking',
+                    'Leadership & Influence'
                 ],
-                'Manager / Lead': [
-                    'Product Sense (Set org-wide design vision)',
-                    'Execution (Scale operations, forecast business)',
-                    'Strategic Thinking (Find new market opportunities)',
-                    'Leadership & Influence (Align executives, drive change)'
+                'Manager': [
+                    'Product Sense',
+                    'Execution',
+                    'Strategic Thinking',
+                    'Leadership & Influence'
                 ]
             },
             'Software Engineer': {
-                'Student/Intern': [
-                    'Coding Fundamentals (Write clean, tested code)',
-                    'Understanding Systems (Learn the existing codebase)',
-                    'Team Collaboration (Respond to code reviews)'
+                'Junior': [
+                    'Coding Fundamentals',
+                    'Understanding Systems',
+                    'Team Collaboration'
                 ],
-                'Junior / Mid-Level': [
-                    'CS Fundamentals in Practice (Apply algorithms, data structures)',
-                    'Component-Level Design (Design APIs and databases)',
-                    'Operational Health (Optimize and debug features)'
+                'Mid': [
+                    'CS Fundamentals in Practice',
+                    'Component-Level Design',
+                    'Operational Health'
                 ],
                 'Senior': [
-                    'System Design Leadership (Lead complex system designs)',
-                    'Technical Leadership (Mentor engineers, drive decisions)',
-                    'Strategic Implementation (Define team testing strategy)'
+                    'System Design',
+                    'Technical Leadership',
+                    'Strategic Implementation'
                 ],
-                'Manager / Lead': [
-                    'System Architecture (Design multi-service platform architecture)',
-                    'Technical Strategy (Set long-term technical vision)',
-                    'Engineering Excellence (Drive org-wide quality standards)'
+                'Manager': [
+                    'System Architecture',
+                    'Technical Strategy',
+                    'Engineering Excellence'
                 ]
             },
             'Data Analyst': {
-                'Student/Intern': [
-                    'Technical Foundations (Query and clean data)',
-                    'Analytical Basics (Perform simple statistical analysis)',
-                    'Reporting (Populate dashboards with data)'
+                'Junior': [
+                    'Technical Foundations',
+                    'Analytical Basics',
+                    'Reporting'
                 ],
-                'Junior / Mid-Level': [
-                    'Technical Proficiency (Develop interactive BI dashboards)',
-                    'Statistical Analysis (Analyze experiments, find insights)',
-                    'Business Impact (Tell compelling stories with data)'
+                'Mid': [
+                    'Technical Proficiency',
+                    'Statistical Analysis',
+                    'Business Impact'
                 ],
                 'Senior': [
-                    'Technical Depth (Optimize queries, build models)',
-                    'Advanced Analytics (Design complex A/B tests)',
-                    'Strategic Partnership (Define key business metrics)'
+                    'Technical Depth',
+                    'Advanced Analytics',
+                    'Strategic Partnership'
                 ],
-                'Manager / Lead': [
-                    'Technical & Systems Thinking (Understand data engineering architecture)',
-                    'Strategic Leadership (Own company-wide experimentation strategy)',
-                    'Executive Communication & Influence (Drive leadership decisions with data)'
+                'Manager': [
+                    'Technical & Systems Thinking',
+                    'Strategic Leadership',
+                    'Executive Communication & Influence'
                 ]
             }
         };

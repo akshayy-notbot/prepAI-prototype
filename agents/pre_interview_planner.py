@@ -51,8 +51,8 @@ class PreInterviewPlanner:
                 "role": role,
                 "skill": skill,
                 "seniority": seniority,
-                "seniority_criteria": playbook.seniority_criteria,
-                "good_vs_great_examples": playbook.good_vs_great_examples,
+                "seniority_criteria": self._get_seniority_criteria_content(playbook.seniority_criteria),
+                "good_vs_great_examples": self._get_good_vs_great_examples_content(playbook.good_vs_great_examples),
                 "interview_objective": playbook.interview_objective,
                 "core_philosophy": getattr(playbook, 'core_philosophy', None),
                 "created_at": str(datetime.utcnow())
@@ -64,6 +64,18 @@ class PreInterviewPlanner:
         except Exception as e:
             print(f"❌ Failed to create interview plan: {e}")
             raise Exception(f"Failed to create interview plan for {role} - {skill} - {seniority}: {str(e)}")
+    
+    def _get_seniority_criteria_content(self, seniority_criteria):
+        """Extract content from seniority_criteria, handling both old and new formats"""
+        if isinstance(seniority_criteria, dict) and "content" in seniority_criteria:
+            return seniority_criteria["content"]
+        return seniority_criteria
+    
+    def _get_good_vs_great_examples_content(self, good_vs_great_examples):
+        """Extract content from good_vs_great_examples, handling both old and new formats"""
+        if isinstance(good_vs_great_examples, dict) and "content" in good_vs_great_examples:
+            return good_vs_great_examples["content"]
+        return good_vs_great_examples
     
     def _get_playbook(self, role: str, skill: str, seniority: str) -> Any:
         """
@@ -85,9 +97,9 @@ class PreInterviewPlanner:
             if not playbook:
                 raise Exception(f"No interview playbook found for {role} - {skill} - {seniority}. Please ensure the playbook exists in the database.")
             
-            # Extract guidance patterns for autonomous decision making
+            # Store the strategy text directly for use in prompts
             if hasattr(playbook, 'pre_interview_strategy') and playbook.pre_interview_strategy:
-                playbook.guidance_patterns = self._extract_guidance_patterns(playbook.pre_interview_strategy)
+                playbook.strategy_text = playbook.pre_interview_strategy
             
             return playbook
                 
@@ -109,19 +121,23 @@ class PreInterviewPlanner:
             raise Exception(f"No evaluation dimensions found in playbook for {role} - {skill} - {seniority}")
         
         # Get all evaluation dimensions from the playbook
-        evaluation_dimensions = playbook.evaluation_dimensions
+        # Handle both old string format and new JSON structure
+        if isinstance(playbook.evaluation_dimensions, dict) and "content" in playbook.evaluation_dimensions:
+            evaluation_dimensions = playbook.evaluation_dimensions["content"]
+        else:
+            evaluation_dimensions = playbook.evaluation_dimensions
         
         # Create prompt for LLM to make intelligent decisions
         prompt = f"""You are a senior expert Interview designer from a top-tier tech company (like Google or Meta) with an experience of more than 15 years in taking interviews.
 You are an expert interviewer planning a {skill} interview for a {seniority} {role} position.
 
 Available evaluation dimensions for this a {skill} interview for a {seniority} {role} position:
-{evaluation_dimensions}. And Seniority expectations are as follows {playbook.seniority_criteria}
+{evaluation_dimensions}. And Seniority expectations are as follows {self._get_seniority_criteria_content(playbook.seniority_criteria)}
 
 Interview objective: {playbook.interview_objective}
 
-Guidance Examples (use as reference, adapt to this specific context):
-{getattr(playbook, 'guidance_patterns', {}).get('archetype_examples', 'No specific guidance available')}
+Pre-Interview Strategy (use as reference, adapt to this specific context):
+{getattr(playbook, 'strategy_text', 'No strategy guidance available')}
 
 Your task is to:
 1. PRIORITIZE: Select the top 3-4 evaluation dimension that should be the primary focus for this role × skill × seniority combination
@@ -185,7 +201,7 @@ Interview Objective: {playbook.interview_objective}
 Archetype: {archetype}
 
 Top evaluation dimensions for this {skill} interview for a {seniority} {role} position we want to evaluate:
-{top_dimensions}. And Seniority expectations are as follows: {playbook.seniority_criteria}
+{top_dimensions}. And Seniority expectations are as follows: {self._get_seniority_criteria_content(playbook.seniority_criteria)}
 
 Interview objective: {playbook.interview_objective}
 
@@ -262,53 +278,4 @@ Return ONLY a JSON object with this exact structure:
         except Exception as e:
             raise Exception(f"LLM prompt generation failed for {role} - {skill} - {seniority}: {str(e)}")
     
-    def _extract_guidance_patterns(self, strategy_text: str) -> Dict[str, Any]:
-        """Extract reusable patterns from strategy text for autonomous decision making"""
-        if not strategy_text or not isinstance(strategy_text, str):
-            raise ValueError("Strategy text must be a non-empty string to extract guidance patterns")
-        
-        return {
-            "archetype_examples": self._extract_archetype_examples(strategy_text),
-            "signal_prioritization_examples": self._extract_signal_examples(strategy_text),
-            "interview_structure_examples": self._extract_structure_examples(strategy_text)
-        }
-
-    def _extract_archetype_examples(self, strategy_text: str) -> str:
-        """Extract archetype selection examples from strategy text"""
-        if not strategy_text or not isinstance(strategy_text, str):
-            raise ValueError("Strategy text must be a non-empty string")
-        
-        # Simple extraction - look for archetype mentions
-        if "Broad Design" in strategy_text:
-            return "Broad Design examples found in guidance"
-        if "Improvement" in strategy_text:
-            return "Improvement examples found in guidance"
-        if "Strategic" in strategy_text:
-            return "Strategic examples found in guidance"
-        
-        raise ValueError(f"No recognized archetype patterns found in strategy text: {strategy_text[:100]}...")
-
-    def _extract_signal_examples(self, strategy_text: str) -> str:
-        """Extract signal prioritization examples"""
-        if not strategy_text or not isinstance(strategy_text, str):
-            raise ValueError("Strategy text must be a non-empty string")
-        
-        # Look for signal-related keywords
-        signal_keywords = ["signal", "evaluation", "dimension", "criteria", "assessment"]
-        if any(keyword in strategy_text.lower() for keyword in signal_keywords):
-            return "Signal prioritization examples available in guidance"
-        
-        raise ValueError(f"No signal prioritization patterns found in strategy text: {strategy_text[:100]}...")
-
-    def _extract_structure_examples(self, strategy_text: str) -> str:
-        """Extract interview structure examples"""
-        if not strategy_text or not isinstance(strategy_text, str):
-            raise ValueError("Strategy text must be a non-empty string")
-        
-        # Look for structure-related keywords
-        structure_keywords = ["structure", "phase", "stage", "timing", "duration", "flow"]
-        if any(keyword in strategy_text.lower() for keyword in structure_keywords):
-            return "Interview structure examples available in guidance"
-        
-        raise ValueError(f"No interview structure patterns found in strategy text: {strategy_text[:100]}...")
     
